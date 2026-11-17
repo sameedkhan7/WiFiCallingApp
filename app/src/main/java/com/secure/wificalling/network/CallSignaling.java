@@ -7,7 +7,7 @@ import android.os.Build;
 import android.util.Log;
 import com.secure.wificalling.security.CryptoUtil;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -22,6 +22,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -30,8 +31,8 @@ import java.util.concurrent.Executors;
 /**
  * Hybrid P2P Signaling Engine:
  * 1. Local Wi-Fi Direct TCP Sockets (Offline LAN, 0 ms lag).
- * 2. Internet MQTT Real-Time Signaling (Free public broker: broker.emqx.io).
- * Works across local Wi-Fi, cross-Wi-Fi, and 4G/5G mobile data seamlessly!
+ * 2. Internet MQTT Real-Time Signaling (HiveMQ broker).
+ * Automatic STUN WAN public endpoint discovery & seamless reconnect.
  */
 public class CallSignaling {
 
@@ -41,9 +42,8 @@ public class CallSignaling {
     public static final int AUDIO_PORT = 50622;
 
     private static final String MQTT_BROKER = "tcp://broker.hivemq.com:1883";
-    private static final String MQTT_BROKER_BACKUP = "tcp://broker.emqx.io:1883";
-    private static final String TOPIC_PREFIX = "wificalling_sk_2026/call/";
-    private static final String PRESENCE_PREFIX = "wificalling_sk_2026/presence/";
+    private static final String TOPIC_PREFIX = "wificall_sk_v5/call/";
+    private static final String PRESENCE_PREFIX = "wificall_sk_v5/presence/";
 
     public interface CallListener {
         void onIncomingCall(String callerName, String callerIp, String callerExt);
@@ -57,13 +57,15 @@ public class CallSignaling {
         public String name;
         public String ext;
         public String localIp;
+        public String publicEndpoint;
         public String networkType; // "Wi-Fi" or "Mobile Data"
         public long lastSeen;
 
-        public PeerStatus(String name, String ext, String localIp, String networkType) {
+        public PeerStatus(String name, String ext, String localIp, String publicEndpoint, String networkType) {
             this.name = name;
             this.ext = ext;
             this.localIp = localIp;
+            this.publicEndpoint = publicEndpoint;
             this.networkType = networkType;
             this.lastSeen = System.currentTimeMillis();
         }
@@ -78,6 +80,8 @@ public class CallSignaling {
 
     public static final ConcurrentHashMap<String, String> onlineDevices = new ConcurrentHashMap<>();
     public static final ConcurrentHashMap<String, PeerStatus> peerStatuses = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<String, String> peerPublicEndpoints = new ConcurrentHashMap<>();
+    public static volatile String myPublicEndpoint = "";
 
     private Context context;
     private String myExtId;
@@ -110,25 +114,48 @@ public class CallSignaling {
         return "102"; // Default
     }
 
+    public static String getPeerPublicEndpoint(String ext) {
+        if (ext == null) return "";
+        String ep = peerPublicEndpoints.get(ext);
+        return ep != null ? ep : "";
+    }
+
     public synchronized void start() {
         if (isRunning) return;
         isRunning = true;
 
         threadPool.execute(this::runSignalingServer);
         threadPool.execute(this::runDiscoveryListener);
-        threadPool.execute(this::initMqtt);
+        threadPool.execute(this::runMqttLoop);
         threadPool.execute(this::runHeartbeatLoop);
+        threadPool.execute(this::refreshPublicEndpoint);
         broadcastPresence();
     }
 
-    private void initMqtt() {
-        String[] brokers = new String[]{MQTT_BROKER, MQTT_BROKER_BACKUP};
-        int brokerIdx = 0;
+    private void refreshPublicEndpoint() {
+        while (isRunning) {
+            try {
+                DatagramSocket sock = new DatagramSocket();
+                StunUtil.StunResult res = StunUtil.getPublicAddress(sock);
+                sock.close();
+                if (res != null) {
+                    myPublicEndpoint = res.publicIp + ":" + res.publicPort;
+                    Log.i(TAG, "Discovered WAN Public Endpoint: " + myPublicEndpoint);
+                }
+            } catch (Exception ignored) {}
 
+            try {
+                Thread.sleep(30000);
+            } catch (InterruptedException ie) {
+                break;
+            }
+        }
+    }
+
+    private void runMqttLoop() {
         while (isRunning) {
             try {
                 if (mqttClient == null || !mqttClient.isConnected()) {
-                    String currentBroker = brokers[brokerIdx % brokers.length];
                     String clientId = "WiFiPhone_" + myExtId + "_" + (System.currentTimeMillis() % 100000);
 
                     if (mqttClient != null) {
@@ -136,17 +163,29 @@ public class CallSignaling {
                         try { mqttClient.close(); } catch (Throwable ignored) {}
                     }
 
-                    mqttClient = new MqttClient(currentBroker, clientId, new MemoryPersistence());
+                    mqttClient = new MqttClient(MQTT_BROKER, clientId, new MemoryPersistence());
                     MqttConnectOptions options = new MqttConnectOptions();
                     options.setAutomaticReconnect(true);
                     options.setCleanSession(true);
-                    options.setConnectionTimeout(8);
-                    options.setKeepAliveInterval(20);
+                    options.setConnectionTimeout(10);
+                    options.setKeepAliveInterval(15);
 
-                    mqttClient.setCallback(new MqttCallback() {
+                    mqttClient.setCallback(new MqttCallbackExtended() {
+                        @Override
+                        public void connectComplete(boolean reconnect, String serverURI) {
+                            Log.i(TAG, "MQTT connectComplete (reconnect=" + reconnect + ") to " + serverURI);
+                            try {
+                                mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
+                                mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
+                                publishPresence();
+                            } catch (Exception e) {
+                                Log.e(TAG, "Subscription on connect error", e);
+                            }
+                        }
+
                         @Override
                         public void connectionLost(Throwable cause) {
-                            Log.w(TAG, "MQTT connection lost, will reconnect");
+                            Log.w(TAG, "MQTT connection lost: " + (cause != null ? cause.getMessage() : "unknown"));
                         }
 
                         @Override
@@ -158,49 +197,59 @@ public class CallSignaling {
                         public void deliveryComplete(IMqttDeliveryToken token) {}
                     });
 
-                    Log.i(TAG, "Connecting to MQTT broker: " + currentBroker);
+                    Log.i(TAG, "Connecting to MQTT broker: " + MQTT_BROKER);
                     mqttClient.connect(options);
                     Log.i(TAG, "Connected to MQTT broker successfully!");
-
-                    // Subscribe to personal incoming calls
-                    mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
-
-                    // Subscribe to all presence updates
-                    mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
-
-                    publishPresence();
-                    break;
                 }
             } catch (Throwable e) {
-                Log.w(TAG, "MQTT connect attempt failed, retrying in 4s: " + e.getMessage());
-                brokerIdx++;
-                try {
-                    Thread.sleep(4000);
-                } catch (InterruptedException ie) {
-                    break;
-                }
+                Log.w(TAG, "MQTT connect failed: " + e.getMessage() + ", will retry in 3s");
             }
+
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException ie) {
+                break;
+            }
+        }
+    }
+
+    private synchronized void ensureMqttConnected() {
+        if (mqttClient == null || !mqttClient.isConnected()) {
+            try {
+                String clientId = "WiFiPhone_" + myExtId + "_" + (System.currentTimeMillis() % 100000);
+                mqttClient = new MqttClient(MQTT_BROKER, clientId, new MemoryPersistence());
+                MqttConnectOptions options = new MqttConnectOptions();
+                options.setAutomaticReconnect(true);
+                options.setCleanSession(true);
+                options.setConnectionTimeout(6);
+                options.setKeepAliveInterval(15);
+                mqttClient.connect(options);
+                mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
+                mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
+            } catch (Throwable ignored) {}
         }
     }
 
     private void handleMqttMessage(String topic, String rawPayload) {
         try {
             if (topic.startsWith(PRESENCE_PREFIX)) {
-                // Presence heartbeat
                 JSONObject json = new JSONObject(rawPayload);
                 String ext = json.optString("ext");
-                if (ext.equals(myExtId)) return; // Ignore self
+                if (ext.equals(myExtId)) return;
 
                 String name = json.optString("name", "Device " + ext);
                 String localIp = json.optString("localIp", "");
+                String publicEp = json.optString("publicEp", "");
                 String netType = json.optString("netType", "Online");
 
-                peerStatuses.put(ext, new PeerStatus(name, ext, localIp, netType));
+                peerStatuses.put(ext, new PeerStatus(name, ext, localIp, publicEp, netType));
+                if (!publicEp.isEmpty()) {
+                    peerPublicEndpoints.put(ext, publicEp);
+                }
                 if (!localIp.isEmpty()) {
                     onlineDevices.put(name, localIp);
                 }
             } else if (topic.equals(TOPIC_PREFIX + myExtId)) {
-                // Incoming call signaling
                 String decrypted = CryptoUtil.decrypt(rawPayload);
                 if (decrypted == null) return;
 
@@ -209,8 +258,13 @@ public class CallSignaling {
                 String senderName = parts.length > 1 ? parts[1] : "Unknown";
                 String senderExt = parts.length > 2 ? parts[2] : "";
                 String senderIp = parts.length > 3 ? parts[3] : "remote";
+                String senderPublicEp = parts.length > 4 ? parts[4] : "";
 
-                Log.i(TAG, "MQTT Signaling received: [" + command + "] from " + senderName + " (" + senderExt + ")");
+                if (!senderExt.isEmpty() && !senderPublicEp.isEmpty()) {
+                    peerPublicEndpoints.put(senderExt, senderPublicEp);
+                }
+
+                Log.i(TAG, "MQTT Signaling received: [" + command + "] from " + senderName + " (Ext: " + senderExt + ")");
                 dispatchSignalingCommand(command, senderName, senderIp, senderExt);
             }
         } catch (Exception e) {
@@ -225,10 +279,11 @@ public class CallSignaling {
             obj.put("ext", myExtId);
             obj.put("name", Build.MODEL);
             obj.put("localIp", getLocalIpAddress());
+            obj.put("publicEp", myPublicEndpoint);
             obj.put("netType", isWifiConnected() ? "Wi-Fi" : "Mobile Data");
 
-            MqttMessage msg = new MqttMessage(obj.toString().getBytes("UTF-8"));
-            msg.setQos(1);
+            MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
+            msg.setQos(0);
             mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
         } catch (Exception ignored) {}
     }
@@ -238,7 +293,7 @@ public class CallSignaling {
             try {
                 publishPresence();
                 broadcastPresence();
-                Thread.sleep(5000);
+                Thread.sleep(4000);
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {}
@@ -282,6 +337,11 @@ public class CallSignaling {
             String senderName = parts.length > 1 ? parts[1] : "Unknown";
             String senderExt = parts.length > 2 ? parts[2] : "";
             String senderIp = socket.getInetAddress().getHostAddress();
+            String senderPublicEp = parts.length > 4 ? parts[4] : "";
+
+            if (!senderExt.isEmpty() && !senderPublicEp.isEmpty()) {
+                peerPublicEndpoints.put(senderExt, senderPublicEp);
+            }
 
             Log.i(TAG, "TCP Signaling received: [" + command + "] from " + senderName + " (" + senderIp + ")");
             dispatchSignalingCommand(command, senderName, senderIp, senderExt);
@@ -321,18 +381,21 @@ public class CallSignaling {
     public void sendCommand(String targetExt, String targetIp, String command) {
         threadPool.execute(() -> {
             String myIp = getLocalIpAddress();
-            String payload = command + "|" + Build.MODEL + "|" + myExtId + "|" + myIp;
+            String payload = command + "|" + Build.MODEL + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint;
             String encrypted = CryptoUtil.encrypt(payload);
 
-            // 1. Send via Internet MQTT (Works 100% across Wi-Fi & 4G/5G mobile data)
-            if (mqttClient != null && mqttClient.isConnected() && targetExt != null && !targetExt.isEmpty()) {
-                try {
-                    MqttMessage msg = new MqttMessage(encrypted.getBytes());
-                    msg.setQos(1);
-                    mqttClient.publish(TOPIC_PREFIX + targetExt, msg);
-                    Log.i(TAG, "Sent [" + command + "] via MQTT to ext " + targetExt);
-                } catch (Exception e) {
-                    Log.w(TAG, "MQTT send failed: " + e.getMessage());
+            // 1. Send via Internet MQTT (Guaranteed delivery across Wi-Fi & 4G/5G mobile data)
+            if (targetExt != null && !targetExt.isEmpty()) {
+                ensureMqttConnected();
+                if (mqttClient != null && mqttClient.isConnected()) {
+                    try {
+                        MqttMessage msg = new MqttMessage(encrypted.getBytes(StandardCharsets.UTF_8));
+                        msg.setQos(1);
+                        mqttClient.publish(TOPIC_PREFIX + targetExt, msg);
+                        Log.i(TAG, "Sent [" + command + "] via MQTT to ext " + targetExt);
+                    } catch (Exception e) {
+                        Log.w(TAG, "MQTT send failed: " + e.getMessage());
+                    }
                 }
             }
 
@@ -372,7 +435,7 @@ public class CallSignaling {
                     String deviceIp = packet.getAddress().getHostAddress();
                     onlineDevices.put(deviceName, deviceIp);
                     if (!ext.isEmpty()) {
-                        peerStatuses.put(ext, new PeerStatus(deviceName, ext, deviceIp, "Wi-Fi"));
+                        peerStatuses.put(ext, new PeerStatus(deviceName, ext, deviceIp, "", "Wi-Fi"));
                     }
                 }
             }
@@ -433,6 +496,4 @@ public class CallSignaling {
         } catch (Exception ignored) {}
         return false;
     }
-
-    public void stop() {}
 }

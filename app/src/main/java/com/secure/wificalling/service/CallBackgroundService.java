@@ -152,7 +152,8 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     public void onIncomingCall(String callerName, String callerIp, String callerExt) {
         Log.i(TAG, "Incoming call from " + callerName + " (Ext: " + callerExt + ", IP: " + callerIp + ")");
 
-        // 1. Send RINGING response back to caller immediately
+        // 1. Record recents interaction & Send RINGING response back to caller immediately
+        MainActivity.recordInteraction(this, callerExt);
         if (signaling != null) {
             signaling.sendCommand(callerExt, callerIp, "RINGING");
         }
@@ -178,6 +179,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             callIntent.putExtra("CALLER_NAME", callerName);
             callIntent.putExtra("CALLER_IP", callerIp);
             callIntent.putExtra("CALLER_EXT", callerExt);
+            callIntent.putExtra("CALLER_PUBLIC_EP", CallSignaling.getPeerPublicEndpoint(callerExt));
             callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
 
             PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(

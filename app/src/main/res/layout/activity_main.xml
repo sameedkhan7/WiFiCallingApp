@@ -15,14 +15,28 @@
         android:paddingEnd="16dp"
         android:background="#1E1E1E">
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Wi-Fi Phone"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wi-Fi Phone"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvMyDeviceIp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Connecting..."
+                android:textSize="12sp"
+                android:textColor="#34A853" />
+        </LinearLayout>
 
         <!-- Add Contact Button (+) -->
         <Button
@@ -56,46 +70,18 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- My Device Info Banner -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_card"
-                android:padding="14dp"
-                android:layout_marginBottom="16dp">
-
-                <TextView
-                    android:id="@+id/tvMyDeviceName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="This Phone: Loading..."
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary" />
-
-                <TextView
-                    android:id="@+id/tvMyDeviceIp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="IP: Checking Wi-Fi..."
-                    android:textSize="13sp"
-                    android:textColor="#34A853"
-                    android:layout_marginTop="2dp" />
-            </LinearLayout>
-
             <!-- Contacts Header -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SAVED SPEED-DIAL CONTACTS"
+                android:text="SPEED-DIAL CONTACTS"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:textColor="#9E9E9E"
                 android:letterSpacing="0.06"
                 android:layout_marginBottom="10dp" />
 
-            <!-- Dynamic Contacts Container -->
+            <!-- Dynamic Contacts Container (Recents first, Self at bottom) -->
             <LinearLayout
                 android:id="@+id/containerContacts"
                 android:layout_width="match_parent"
@@ -111,7 +97,7 @@
                 android:textSize="11sp"
                 android:textColor="#757575"
                 android:layout_marginTop="28dp"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="24dp" />
 
         </LinearLayout>
     </ScrollView>

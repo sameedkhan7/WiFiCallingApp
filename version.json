@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 5,
-  "versionName": "1.0.5",
+  "versionCode": 6,
+  "versionName": "1.0.6",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Removed loopback IP scan (no more 127.0.0.X entries)\n2. Fix: Guaranteed 4-phone extension mapping (Vivo: 101, OnePlus: 102, S24: 103, M35: 104)\n3. Dedicated MQTT channel for instant 4G/5G presence\n4. Ultra-clean Google Dialer UI with live badges"
+  "changelog": "1. Fix: Self device is always pinned at the VERY BOTTOM with 'YOU' badge\n2. Feature: Dynamic Recents Sorting (most recently called contact jumps to #1 top)\n3. Fix: Cross-network calling (4G/5G <-> Wi-Fi) with STUN NAT traversal & unified HiveMQ signaling\n4. Fix: Immediate ringtone shutdown on call end/reject"
 }

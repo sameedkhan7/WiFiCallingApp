@@ -1,7 +1,6 @@
 package com.secure.wificalling.audio;
 
 import android.content.Context;
-import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
@@ -9,21 +8,20 @@ import android.media.AudioTrack;
 import android.media.MediaRecorder;
 import android.media.audiofx.AcousticEchoCanceler;
 import android.media.audiofx.NoiseSuppressor;
-import android.os.Build;
 import android.os.Process;
 import android.util.Log;
 import com.secure.wificalling.network.CallSignaling;
+import com.secure.wificalling.network.StunUtil;
 import com.secure.wificalling.security.CryptoUtil;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.List;
 
 /**
  * High-Definition Low-Latency Full-Duplex Voice Engine.
- * Fixed 20ms Frame Processing (640 bytes @ 16kHz mono 16-bit PCM).
- * Large jitter socket buffers (128 KB) to maintain audio quality over distance.
+ * Single UDP Socket with STUN NAT Hole Punching & Symmetric Reflection.
+ * Works seamlessly across local Wi-Fi, cross-Wi-Fi, and 4G/5G mobile networks.
  */
 public class VoiceEngine {
 
@@ -32,28 +30,33 @@ public class VoiceEngine {
     private static final int CHANNEL_CONFIG_IN = AudioFormat.CHANNEL_IN_MONO;
     private static final int CHANNEL_CONFIG_OUT = AudioFormat.CHANNEL_OUT_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
-    private static final int FRAME_SIZE = 640; // Exact 20 ms frame
+    private static final int FRAME_SIZE = 640; // 20 ms frame @ 16kHz 16-bit mono
 
     private Context context;
     private volatile boolean isCalling = false;
     private String remoteIp;
+    private String remotePublicEndpoint;
     private boolean isMuted = false;
     private boolean isSpeakerphone = false;
 
     private AudioRecord audioRecord;
     private AudioTrack audioTrack;
-    private DatagramSocket udpSocket;
+    private DatagramSocket sharedUdpSocket;
 
     private AcousticEchoCanceler echoCanceler;
     private NoiseSuppressor noiseSuppressor;
+
+    private volatile InetAddress targetAddress;
+    private volatile int targetPort = CallSignaling.AUDIO_PORT;
 
     public VoiceEngine(Context context) {
         this.context = context;
     }
 
-    public void startCall(String remoteIp) {
+    public void startCall(String remoteIp, String remotePublicEndpoint) {
         if (isCalling) return;
         this.remoteIp = remoteIp;
+        this.remotePublicEndpoint = remotePublicEndpoint;
         this.isCalling = true;
 
         AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -61,8 +64,74 @@ public class VoiceEngine {
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
         }
 
+        try {
+            sharedUdpSocket = new DatagramSocket(null);
+            sharedUdpSocket.setReuseAddress(true);
+            sharedUdpSocket.setReceiveBufferSize(256 * 1024);
+            sharedUdpSocket.setSendBufferSize(256 * 1024);
+            sharedUdpSocket.bind(new InetSocketAddress(CallSignaling.AUDIO_PORT));
+        } catch (Exception e) {
+            Log.w(TAG, "Binding to AUDIO_PORT 50622 failed, using ephemeral port", e);
+            try {
+                sharedUdpSocket = new DatagramSocket();
+                sharedUdpSocket.setReceiveBufferSize(256 * 1024);
+                sharedUdpSocket.setSendBufferSize(256 * 1024);
+            } catch (Exception ignored) {}
+        }
+
+        // Initialize target address candidates
+        try {
+            if (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.equals("127.0.0.1") && !remoteIp.isEmpty()) {
+                targetAddress = InetAddress.getByName(remoteIp);
+                targetPort = CallSignaling.AUDIO_PORT;
+            } else if (remotePublicEndpoint != null && remotePublicEndpoint.contains(":")) {
+                String[] parts = remotePublicEndpoint.split(":");
+                targetAddress = InetAddress.getByName(parts[0]);
+                targetPort = Integer.parseInt(parts[1]);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Target address resolution: " + e.getMessage());
+        }
+
+        // Punch NAT holes concurrently
+        new Thread(this::punchNatHoles, "NatHolePunchThread").start();
+
         new Thread(this::recordAndSend, "AudioRecordThread").start();
         new Thread(this::receiveAndPlay, "AudioTrackThread").start();
+    }
+
+    public void startCall(String remoteIp) {
+        startCall(remoteIp, null);
+    }
+
+    private void punchNatHoles() {
+        if (sharedUdpSocket == null) return;
+        try {
+            // 1. Discover and punch through NAT via STUN
+            StunUtil.getPublicAddress(sharedUdpSocket);
+
+            byte[] punchBytes = new byte[32];
+            java.util.Arrays.fill(punchBytes, (byte) 0xAA);
+
+            // 2. Blast hole punch packets to both local IP and public WAN endpoint
+            for (int i = 0; i < 8 && isCalling; i++) {
+                if (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.equals("127.0.0.1") && !remoteIp.isEmpty()) {
+                    try {
+                        InetAddress lanAddr = InetAddress.getByName(remoteIp);
+                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, lanAddr, CallSignaling.AUDIO_PORT));
+                    } catch (Exception ignored) {}
+                }
+                if (remotePublicEndpoint != null && remotePublicEndpoint.contains(":")) {
+                    try {
+                        String[] parts = remotePublicEndpoint.split(":");
+                        InetAddress wanAddr = InetAddress.getByName(parts[0]);
+                        int wanPort = Integer.parseInt(parts[1]);
+                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, wanAddr, wanPort));
+                    } catch (Exception ignored) {}
+                }
+                Thread.sleep(120);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void recordAndSend() {
@@ -89,13 +158,6 @@ public class VoiceEngine {
             }
 
             audioRecord.startRecording();
-
-            DatagramSocket sendSocket = new DatagramSocket();
-            sendSocket.setSendBufferSize(128 * 1024);
-
-            InetAddress targetAddr = (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.isEmpty())
-                    ? InetAddress.getByName(remoteIp) : null;
-
             byte[] frame = new byte[FRAME_SIZE];
 
             while (isCalling) {
@@ -113,15 +175,14 @@ public class VoiceEngine {
 
                     CryptoUtil.encryptAudioBuffer(frame, 0, FRAME_SIZE);
 
-                    if (targetAddr != null) {
-                        DatagramPacket packet = new DatagramPacket(frame, FRAME_SIZE, targetAddr, CallSignaling.AUDIO_PORT);
-                        sendSocket.send(packet);
+                    if (targetAddress != null && sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
+                        DatagramPacket packet = new DatagramPacket(frame, FRAME_SIZE, targetAddress, targetPort);
+                        sharedUdpSocket.send(packet);
                     }
                 }
             }
-            sendSocket.close();
         } catch (Exception e) {
-            Log.e(TAG, "RecordAndSend error", e);
+            Log.e(TAG, "recordAndSend error", e);
         } finally {
             if (audioRecord != null) {
                 try {
@@ -144,39 +205,35 @@ public class VoiceEngine {
 
             audioTrack.play();
 
-            udpSocket = new DatagramSocket(null);
-            udpSocket.setReuseAddress(true);
-            udpSocket.setReceiveBufferSize(128 * 1024);
-            udpSocket.bind(new InetSocketAddress(CallSignaling.AUDIO_PORT));
+            byte[] inBuffer = new byte[FRAME_SIZE + 128];
+            DatagramPacket packet = new DatagramPacket(inBuffer, inBuffer.length);
 
-            byte[] buffer = new byte[FRAME_SIZE * 2];
+            while (isCalling && sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
+                try {
+                    sharedUdpSocket.receive(packet);
+                    int len = packet.getLength();
 
-            while (isCalling) {
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                udpSocket.receive(packet);
+                    // Discard small NAT keepalive / punch packets (32 bytes)
+                    if (len == FRAME_SIZE) {
+                        // Symmetric Reflection: Lock return traffic directly to sender
+                        targetAddress = packet.getAddress();
+                        targetPort = packet.getPort();
 
-                int len = packet.getLength();
-                if (len > 0) {
-                    // Update remote IP from incoming audio packets if needed
-                    if (remoteIp == null || remoteIp.equals("remote")) {
-                        remoteIp = packet.getAddress().getHostAddress();
+                        CryptoUtil.decryptAudioBuffer(inBuffer, 0, len);
+                        audioTrack.write(inBuffer, 0, len);
                     }
-
-                    CryptoUtil.decryptAudioBuffer(packet.getData(), 0, len);
-                    audioTrack.write(packet.getData(), 0, len);
+                } catch (Exception e) {
+                    if (!isCalling) break;
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "ReceiveAndPlay error", e);
+            Log.e(TAG, "receiveAndPlay error", e);
         } finally {
             if (audioTrack != null) {
                 try {
                     audioTrack.stop();
                     audioTrack.release();
                 } catch (Exception ignored) {}
-            }
-            if (udpSocket != null) {
-                udpSocket.close();
             }
         }
     }
@@ -185,46 +242,36 @@ public class VoiceEngine {
         this.isMuted = mute;
     }
 
-    public void setSpeakerphone(boolean speakerphone) {
-        this.isSpeakerphone = speakerphone;
+    public void setSpeakerphone(boolean speaker) {
+        this.isSpeakerphone = speaker;
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        if (am == null) return;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                if (speakerphone) {
-                    List<AudioDeviceInfo> devices = am.getAvailableCommunicationDevices();
-                    for (AudioDeviceInfo dev : devices) {
-                        if (dev.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                            am.setCommunicationDevice(dev);
-                            break;
-                        }
-                    }
-                } else {
-                    am.clearCommunicationDevice();
-                }
-            } catch (Throwable t) {
-                am.setSpeakerphoneOn(speakerphone);
-            }
-        } else {
-            am.setSpeakerphoneOn(speakerphone);
+        if (am != null) {
+            am.setSpeakerphoneOn(speaker);
         }
     }
 
-    public void stopCall() {
+    public synchronized void stopCall() {
+        if (!isCalling) return;
         isCalling = false;
-        if (echoCanceler != null) echoCanceler.release();
-        if (noiseSuppressor != null) noiseSuppressor.release();
+
+        if (sharedUdpSocket != null) {
+            try {
+                sharedUdpSocket.close();
+            } catch (Exception ignored) {}
+            sharedUdpSocket = null;
+        }
+
+        if (echoCanceler != null) {
+            try { echoCanceler.release(); } catch (Throwable ignored) {}
+        }
+        if (noiseSuppressor != null) {
+            try { noiseSuppressor.release(); } catch (Throwable ignored) {}
+        }
 
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         if (am != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                try {
-                    am.clearCommunicationDevice();
-                } catch (Throwable ignored) {}
-            }
-            am.setSpeakerphoneOn(false);
             am.setMode(AudioManager.MODE_NORMAL);
+            am.setSpeakerphoneOn(false);
         }
     }
 }

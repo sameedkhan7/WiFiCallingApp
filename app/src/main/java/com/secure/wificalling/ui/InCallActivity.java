@@ -31,6 +31,7 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
     private String remoteIp;
     private String remoteName;
     private String remoteExt;
+    private String remotePublicEndpoint;
     private boolean isOutgoing;
 
     private TextView tvStatus;
@@ -53,6 +54,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         remoteName = getIntent().getStringExtra("REMOTE_NAME");
         remoteIp = getIntent().getStringExtra("REMOTE_IP");
         remoteExt = getIntent().getStringExtra("REMOTE_EXT");
+        remotePublicEndpoint = getIntent().getStringExtra("REMOTE_PUBLIC_EP");
+        if (remotePublicEndpoint == null || remotePublicEndpoint.isEmpty()) {
+            remotePublicEndpoint = CallSignaling.getPeerPublicEndpoint(remoteExt);
+        }
         isOutgoing = getIntent().getBooleanExtra("IS_OUTGOING", true);
 
         TextView tvName = findViewById(R.id.tvInCallName);
@@ -122,8 +127,12 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
             chronometer.start();
         });
 
+        if (remotePublicEndpoint == null || remotePublicEndpoint.isEmpty()) {
+            remotePublicEndpoint = CallSignaling.getPeerPublicEndpoint(remoteExt);
+        }
+
         voiceEngine = new VoiceEngine(this);
-        voiceEngine.startCall(remoteIp);
+        voiceEngine.startCall(remoteIp, remotePublicEndpoint);
     }
 
     private synchronized void endCall(boolean notifyRemote) {
