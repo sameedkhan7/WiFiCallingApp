@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_dark">
+
+    <!-- Google Dialer Style Top App Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="16dp"
+        android:background="#1E1E1E">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Wi-Fi Phone"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <!-- Add Contact Button (+) -->
+        <Button
+            android:id="@+id/btnTopAddContact"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:text="＋"
+            android:textSize="22sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_button_call"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Profile / Settings Icon -->
+        <Button
+            android:id="@+id/btnTopSettings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:text="⚙"
+            android:textSize="20sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_card" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- My Device Info Banner -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card"
+                android:padding="14dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/tvMyDeviceName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="This Phone: Loading..."
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/tvMyDeviceIp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="IP: Checking Wi-Fi..."
+                    android:textSize="13sp"
+                    android:textColor="#34A853"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Contacts Header -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SAVED SPEED-DIAL CONTACTS"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#9E9E9E"
+                android:letterSpacing="0.06"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Dynamic Contacts Container -->
+            <LinearLayout
+                android:id="@+id/containerContacts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Discovered Devices Section -->
+            <TextView
+                android:id="@+id/tvDiscoveredHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DISCOVERED ON WI-FI (TAP TO ADD)"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#34A853"
+                android:letterSpacing="0.06"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:id="@+id/containerDiscovered"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Security Footer -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:text="🔒 AES-256 Encrypted • Zero Server / Local Wi-Fi Only"
+                android:textSize="11sp"
+                android:textColor="#757575"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="16dp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

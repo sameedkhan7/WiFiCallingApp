@@ -1,0 +1,37 @@
+R_DEF: Internal format may change without notice
+local
+color accent
+color background_dark
+color call_green
+color call_red
+color primary
+color primary_dark
+color surface_dark
+color text_primary
+color text_secondary
+drawable bg_button_call
+drawable bg_button_reject
+drawable bg_card
+drawable bg_circle_avatar
+id btnAnswer
+id btnHangup
+id btnMute
+id btnReject
+id btnSpeaker
+id btnTopAddContact
+id btnTopSettings
+id callChronometer
+id containerContacts
+id containerDiscovered
+id tvCallerName
+id tvDiscoveredHeader
+id tvInCallName
+id tvInCallStatus
+id tvMyDeviceIp
+id tvMyDeviceName
+layout activity_in_call
+layout activity_incoming_call
+layout activity_main
+string app_name
+style Theme.WiFiCalling
+xml file_paths

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121212"
+    android:gravity="center_horizontal"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/tvInCallName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Connected Device"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="50dp" />
+
+    <!-- Call Duration Chronometer -->
+    <Chronometer
+        android:id="@+id/callChronometer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textColor="#2ECC71"
+        android:layout_marginTop="8dp" />
+
+    <FrameLayout
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:background="@drawable/bg_circle_avatar"
+        android:layout_marginTop="50dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="🔒"
+            android:textSize="40sp" />
+    </FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- In-Call Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <Button
+            android:id="@+id/btnMute"
+            android:layout_width="100dp"
+            android:layout_height="48dp"
+            android:text="Mute"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_card"
+            android:layout_marginEnd="16dp" />
+
+        <Button
+            android:id="@+id/btnSpeaker"
+            android:layout_width="100dp"
+            android:layout_height="48dp"
+            android:text="Speaker"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_card" />
+    </LinearLayout>
+
+    <!-- End Call Button -->
+    <Button
+        android:id="@+id/btnHangup"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="END CALL"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button_reject"
+        android:layout_marginBottom="30dp" />
+
+</LinearLayout>

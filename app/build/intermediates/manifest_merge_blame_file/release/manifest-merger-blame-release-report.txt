@@ -1,0 +1,200 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.secure.wificalling"
+4    android:versionCode="2"
+5    android:versionName="1.0.2" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="34" />
+10
+11    <!-- Audio & Network Permissions -->
+12    <uses-permission android:name="android.permission.INTERNET" />
+12-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:5:5-67
+12-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:5:22-64
+13    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+13-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:6:5-79
+13-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:6:22-76
+14    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+14-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:7:5-76
+14-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:7:22-73
+15    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+15-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:8:5-86
+15-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:8:22-83
+16    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+16-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:9:5-71
+16-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:9:22-68
+17    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+17-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:10:5-80
+17-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:10:22-77
+18    <uses-permission android:name="android.permission.WAKE_LOCK" />
+18-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:11:5-68
+18-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:11:22-65
+19    <uses-permission android:name="android.permission.VIBRATE" />
+19-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:12:5-66
+19-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:12:22-63
+20    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+20-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:5-75
+20-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:22-72
+21    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+21-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:14:5-81
+21-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:14:22-78
+22    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+22-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:15:5-81
+22-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:15:22-78
+23
+24    <!-- Foreground Service & Calling Permissions (Android 9 to 14) -->
+25    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+25-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:5-77
+25-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:22-74
+26    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+26-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:5-88
+26-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:22-85
+27    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+27-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:5-94
+27-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:22-91
+28    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+28-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:5-87
+28-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:22-84
+29    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+29-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:5-75
+29-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:22-72
+30    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+30-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:23:5-77
+30-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:23:22-74
+31    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+31-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:5-83
+31-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:22-80
+32
+33    <permission
+33-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+34        android:name="com.secure.wificalling.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+34-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+35        android:protectionLevel="signature" />
+35-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+36
+37    <uses-permission android:name="com.secure.wificalling.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+37-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+37-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+38
+39    <application
+39-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:26:5-79:19
+40        android:allowBackup="false"
+40-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:27:9-36
+41        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+41-->[androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+42        android:extractNativeLibs="true"
+43        android:icon="@android:drawable/sym_action_call"
+43-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:28:9-57
+44        android:label="Wi-Fi Phone"
+44-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:29:9-36
+45        android:theme="@style/Theme.WiFiCalling"
+45-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:30:9-49
+46        android:usesCleartextTraffic="true" >
+46-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:31:9-44
+47
+48        <!-- Main Google Dialer Interface -->
+49        <activity
+49-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:34:9-42:20
+50            android:name="com.secure.wificalling.ui.MainActivity"
+50-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:35:13-44
+51            android:exported="true"
+51-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:36:13-36
+52            android:launchMode="singleTop" >
+52-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:37:13-43
+53            <intent-filter>
+53-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:38:13-41:29
+54                <action android:name="android.intent.action.MAIN" />
+54-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:39:17-69
+54-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:39:25-66
+55
+56                <category android:name="android.intent.category.LAUNCHER" />
+56-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:40:17-77
+56-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:40:27-74
+57            </intent-filter>
+58        </activity>
+59
+60        <!-- Full-Screen Incoming Call Activity (Wakes up locked screen) -->
+61        <activity
+61-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:45:9-52:52
+62            android:name="com.secure.wificalling.ui.IncomingCallActivity"
+62-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:46:13-52
+63            android:excludeFromRecents="true"
+63-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:51:13-46
+64            android:exported="false"
+64-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:47:13-37
+65            android:launchMode="singleTop"
+65-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:48:13-43
+66            android:screenOrientation="portrait"
+66-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:52:13-49
+67            android:showOnLockScreen="true"
+67-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:49:13-44
+68            android:turnScreenOn="true" />
+68-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:50:13-40
+69
+70        <!-- Active In-Call Screen -->
+71        <activity
+71-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:55:9-59:52
+72            android:name="com.secure.wificalling.ui.InCallActivity"
+72-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:56:13-46
+73            android:exported="false"
+73-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:57:13-37
+74            android:launchMode="singleTop"
+74-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:58:13-43
+75            android:screenOrientation="portrait" />
+75-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:59:13-49
+76
+77        <!-- Persistent Background Call Listener Service -->
+78        <service
+78-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:62:9-66:72
+79            android:name="com.secure.wificalling.service.CallBackgroundService"
+79-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:63:13-58
+80            android:enabled="true"
+80-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:64:13-35
+81            android:exported="false"
+81-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:65:13-37
+82            android:foregroundServiceType="connectedDevice|dataSync" />
+82-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:66:13-69
+83
+84        <!-- FileProvider for In-App Auto-Updates -->
+85        <provider
+85-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:69:9-77:20
+86            android:name="androidx.core.content.FileProvider"
+86-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:70:13-62
+87            android:authorities="com.secure.wificalling.fileprovider"
+87-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:71:13-70
+88            android:exported="false"
+88-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:72:13-37
+89            android:grantUriPermissions="true" >
+89-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:73:13-47
+90            <meta-data
+90-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:74:13-76:54
+91                android:name="android.support.FILE_PROVIDER_PATHS"
+91-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:75:17-67
+92                android:resource="@xml/file_paths" />
+92-->C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:76:17-51
+93        </provider>
+94        <provider
+94-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+95            android:name="androidx.startup.InitializationProvider"
+95-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:25:13-67
+96            android:authorities="com.secure.wificalling.androidx-startup"
+96-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:26:13-68
+97            android:exported="false" >
+97-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:27:13-37
+98            <meta-data
+98-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+99                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+99-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:30:17-75
+100                android:value="androidx.startup" />
+100-->[androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:31:17-49
+101            <meta-data
+101-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\SK\.gradle\caches\transforms-4\a332f8f7d50047bd4485b17d5b002c0a\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:31:13-33:52
+102                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+102-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\SK\.gradle\caches\transforms-4\a332f8f7d50047bd4485b17d5b002c0a\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:32:17-78
+103                android:value="androidx.startup" />
+103-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\SK\.gradle\caches\transforms-4\a332f8f7d50047bd4485b17d5b002c0a\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:33:17-49
+104        </provider>
+105    </application>
+106
+107</manifest>

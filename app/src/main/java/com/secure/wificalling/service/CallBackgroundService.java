@@ -1,0 +1,287 @@
+package com.secure.wificalling.service;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.util.Log;
+import androidx.core.app.NotificationCompat;
+import com.secure.wificalling.network.CallSignaling;
+import com.secure.wificalling.ui.IncomingCallActivity;
+import com.secure.wificalling.ui.MainActivity;
+
+/**
+ * 24/7 Persistent Call Listener Background Service.
+ * Bypasses aggressive battery management and lockscreen restrictions
+ * on Vivo (Android 5.0.2), OnePlus (Android 14), and Samsung (Android 14+).
+ */
+public class CallBackgroundService extends Service implements CallSignaling.CallListener {
+
+    private static final String TAG = "CallBackgroundService";
+    private static final String CHANNEL_ID = "WiFiCallingChannel";
+    private static final String CALL_CHANNEL_ID = "WiFiIncomingCallChannel";
+    private static final int NOTIFICATION_ID = 1001;
+    private static final int INCOMING_CALL_NOTIF_ID = 1002;
+
+    private CallSignaling signaling;
+    private PowerManager.WakeLock wakeLock;
+    private WifiManager.WifiLock wifiLock;
+    private MediaPlayer incomingRingtonePlayer;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            acquireLocks();
+            startForegroundServiceNotification();
+
+            signaling = new CallSignaling(this, this);
+            signaling.start();
+            Log.i(TAG, "CallBackgroundService running 24/7.");
+        } catch (Throwable t) {
+            Log.e(TAG, "Error in onCreate", t);
+        }
+    }
+
+    private void acquireLocks() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:ServiceWakeLock");
+                wakeLock.acquire();
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "WakeLock error", t);
+        }
+
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm != null) {
+                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
+                wifiLock.acquire();
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "WifiLock error", t);
+        }
+    }
+
+    private void startForegroundServiceNotification() {
+        try {
+            createNotificationChannels();
+
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this, 0, notificationIntent,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0
+            );
+
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Wi-Fi Phone Active")
+                    .setContentText("Ready to receive calls")
+                    .setSmallIcon(android.R.drawable.sym_action_call)
+                    .setContentIntent(pendingIntent)
+                    .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+                } catch (Throwable t1) {
+                    startForeground(NOTIFICATION_ID, notification);
+                }
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed startForegroundServiceNotification", t);
+        }
+    }
+
+    private void createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                NotificationManager manager = getSystemService(NotificationManager.class);
+                if (manager != null) {
+                    // Ongoing listener channel
+                    NotificationChannel channel = new NotificationChannel(
+                            CHANNEL_ID,
+                            "Wi-Fi Calling Active",
+                            NotificationManager.IMPORTANCE_LOW
+                    );
+                    manager.createNotificationChannel(channel);
+
+                    // High-Priority Incoming Call Channel (breaks through lockscreen & sleep)
+                    NotificationChannel callChannel = new NotificationChannel(
+                            CALL_CHANNEL_ID,
+                            "Incoming Calls",
+                            NotificationManager.IMPORTANCE_HIGH
+                    );
+                    callChannel.enableVibration(true);
+                    callChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                    manager.createNotificationChannel(callChannel);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "Error creating notification channels", t);
+            }
+        }
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return START_STICKY;
+    }
+
+    @Override
+    public void onIncomingCall(String callerName, String callerIp) {
+        Log.i(TAG, "Incoming call received from " + callerName + " (" + callerIp + ")");
+
+        // 1. Send RINGING response back to caller immediately so caller knows receiver is ringing
+        if (signaling != null) {
+            signaling.sendCommand(callerIp, "RINGING", Build.MODEL);
+        }
+
+        // 2. Wake screen from deep sleep
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                PowerManager.WakeLock fullWake = pm.newWakeLock(
+                        PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                        "WiFiCalling:IncomingCallWake"
+                );
+                fullWake.acquire(30000);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Screen wake error", t);
+        }
+
+        // 3. Play loud ringtone immediately
+        playIncomingRingtone();
+
+        // 4. Launch FullScreen Intent & Activity
+        try {
+            Intent callIntent = new Intent(this, IncomingCallActivity.class);
+            callIntent.putExtra("CALLER_NAME", callerName);
+            callIntent.putExtra("CALLER_IP", callerIp);
+            callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+
+            PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+                    this, 0, callIntent,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT
+            );
+
+            NotificationCompat.Builder notifBuilder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.sym_action_call)
+                    .setContentTitle("Incoming Wi-Fi Call")
+                    .setContentText(callerName + " is calling...")
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setFullScreenIntent(fullScreenPendingIntent, true)
+                    .setAutoCancel(true);
+
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(INCOMING_CALL_NOTIF_ID, notifBuilder.build());
+            }
+
+            // Also launch directly for legacy Android versions like Vivo Android 5
+            startActivity(callIntent);
+        } catch (Throwable t) {
+            Log.e(TAG, "Error displaying incoming call", t);
+        }
+    }
+
+    private synchronized void playIncomingRingtone() {
+        try {
+            stopIncomingRingtone();
+            Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            incomingRingtonePlayer = new MediaPlayer();
+            incomingRingtonePlayer.setDataSource(this, ringtoneUri);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                incomingRingtonePlayer.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+            } else {
+                incomingRingtonePlayer.setAudioStreamType(AudioManager.STREAM_RING);
+            }
+            incomingRingtonePlayer.setLooping(true);
+            incomingRingtonePlayer.prepare();
+            incomingRingtonePlayer.start();
+        } catch (Throwable t) {
+            Log.e(TAG, "Error playing ringtone", t);
+        }
+    }
+
+    private synchronized void stopIncomingRingtone() {
+        try {
+            if (incomingRingtonePlayer != null) {
+                if (incomingRingtonePlayer.isPlaying()) {
+                    incomingRingtonePlayer.stop();
+                }
+                incomingRingtonePlayer.release();
+                incomingRingtonePlayer = null;
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    public void onCallRinging(String remoteIp) {}
+
+    @Override
+    public void onCallAccepted(String remoteIp) {
+        stopIncomingRingtone();
+        dismissIncomingNotification();
+    }
+
+    @Override
+    public void onCallRejected(String remoteIp) {
+        stopIncomingRingtone();
+        dismissIncomingNotification();
+    }
+
+    @Override
+    public void onCallEnded(String remoteIp) {
+        stopIncomingRingtone();
+        dismissIncomingNotification();
+    }
+
+    private void dismissIncomingNotification() {
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.cancel(INCOMING_CALL_NOTIF_ID);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopIncomingRingtone();
+        try {
+            if (signaling != null) signaling.removeListener(this);
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}

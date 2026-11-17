@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.secure.wificalling'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.secure.wificalling"
+        minSdk 21        // Android 5.0 (Vivo Y51L)
+        targetSdk 34     // Android 14 (OnePlus & Samsung S24 Ultra - Eliminates Play Protect older version warning)
+        versionCode 2
+        versionName "1.0.2"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "SecureWiFi2026"
+            keyAlias "wificalling"
+            keyPassword "SecureWiFi2026"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
+            because("kotlin-stdlib-jdk7 is now part of kotlin-stdlib")
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22") {
+            because("kotlin-stdlib-jdk8 is now part of kotlin-stdlib")
+        }
+    }
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core:1.12.0'
+}

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_dark"
+    android:padding="20dp">
+
+    <!-- Header Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Wi-Fi Phone"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+
+    <!-- Current Device Indicator -->
+    <TextView
+        android:id="@+id/tvMyDeviceName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="This Phone: Device"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SPEED DIAL (LONG PRESS TO EDIT NAME/NUMBER)"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="#34A853"
+        android:letterSpacing="0.08"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Card 1: My OnePlus (Main) -->
+    <LinearLayout
+        android:id="@+id/cardOnePlus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_card"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvNameOnePlus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="My OnePlus (Main)"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvStatusOnePlus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚪ Checking..."
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnCallOnePlus"
+            android:layout_width="85dp"
+            android:layout_height="42dp"
+            android:text="CALL"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_button_call" />
+    </LinearLayout>
+
+    <!-- Card 2: Home Vivo Y51L -->
+    <LinearLayout
+        android:id="@+id/cardVivo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_card"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvNameVivo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Home Vivo Y51L"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvStatusVivo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚪ Checking..."
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnCallVivo"
+            android:layout_width="85dp"
+            android:layout_height="42dp"
+            android:text="CALL"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_button_call" />
+    </LinearLayout>
+
+    <!-- Card 3: Third Phone -->
+    <LinearLayout
+        android:id="@+id/cardThird"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_card"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvNameThird"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Family Phone 3"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvStatusThird"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚪ Checking..."
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnCallThird"
+            android:layout_width="85dp"
+            android:layout_height="42dp"
+            android:text="CALL"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_button_call" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Security Badge -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="🔒 End-to-End Encrypted (AES-256) • 100% Offline P2P"
+        android:textSize="11sp"
+        android:textColor="#888888" />
+
+</LinearLayout>

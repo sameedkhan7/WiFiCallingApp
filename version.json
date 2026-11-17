@@ -1,0 +1,6 @@
+﻿{
+  "versionCode": 2,
+  "versionName": "1.0.2",
+  "downloadUrl": "https://github.com/sameedkhan7/WiFiCallingApp/releases/download/v1.0.2/WiFiPhone.apk",
+  "changelog": "1. Full Google Dialer UI with Contact Management\n2. Wake Vivo & locked phones with FullScreenIntent\n3. Fixed call timing and synchronized hangup\n4. Added In-App 1-Click Auto Updates\n5. Pre-configured 4 devices: Vivo (101), OnePlus (102), S24 Ultra (103), M35 (104)"
+}
