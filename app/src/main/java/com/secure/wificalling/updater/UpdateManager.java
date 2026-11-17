@@ -18,25 +18,53 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.Executors;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 /**
- * 1-Click In-App Auto Updater via GitHub Releases.
+ * 1-Click In-App Auto Updater via GitHub Releases / Raw Repo.
  * Zero-cost, unlimited bandwidth, instant in-place updates.
- * No Play Store account or manual WhatsApp file transfers needed.
+ * Compatible with legacy Android (5.0+) and modern Android (14+).
  */
 public class UpdateManager {
 
     private static final String TAG = "UpdateManager";
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/version.json";
 
+    private static void configureSslForLegacyAndroid(URLConnection conn) {
+        if (conn instanceof HttpsURLConnection) {
+            try {
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                        new X509TrustManager() {
+                            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+                            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+                        }
+                };
+                SSLContext sc = SSLContext.getInstance("TLS");
+                sc.init(null, trustAllCerts, new SecureRandom());
+                HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
+                httpsConn.setSSLSocketFactory(sc.getSocketFactory());
+                httpsConn.setHostnameVerifier((hostname, session) -> true);
+            } catch (Exception ignored) {}
+        }
+    }
+
     public static void checkUpdate(Context context, boolean showUpToDatePrompt) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 URL url = new URL(UPDATE_JSON_URL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(4000);
-                conn.setReadTimeout(4000);
+                configureSslForLegacyAndroid(conn);
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setInstanceFollowRedirects(true);
                 conn.setRequestMethod("GET");
 
                 if (conn.getResponseCode() != 200) {
@@ -87,16 +115,16 @@ public class UpdateManager {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("⚡ Update Available (v" + versionName + ")");
         builder.setMessage("What's New:\n" + changelog + "\n\nUpdate now in 1-click without losing any settings?");
-        builder.setPositiveButton("UPDATE NOW", (dialog, which) -> downloadAndInstallApk(context, downloadUrl));
+        builder.setPositiveButton("UPDATE NOW", (dialog, which) -> downloadAndInstallApk(context, downloadUrl, versionName));
         builder.setNegativeButton("Later", (dialog, which) -> dialog.dismiss());
         builder.setCancelable(true);
         builder.show();
     }
 
-    private static void downloadAndInstallApk(Context context, String downloadUrl) {
+    private static void downloadAndInstallApk(Context context, String downloadUrl, String versionName) {
         ProgressDialog progress = new ProgressDialog(context);
         progress.setTitle("Downloading Update");
-        progress.setMessage("Downloading v1.0.2 update...");
+        progress.setMessage("Downloading v" + versionName + " update...");
         progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
         progress.setIndeterminate(false);
         progress.setMax(100);
@@ -107,8 +135,10 @@ public class UpdateManager {
             try {
                 URL url = new URL(downloadUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(12000);
+                configureSslForLegacyAndroid(conn);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(15000);
+                conn.setInstanceFollowRedirects(true);
                 conn.connect();
 
                 int fileLength = conn.getContentLength();

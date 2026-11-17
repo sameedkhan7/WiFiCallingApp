@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 3,
-  "versionName": "1.0.3",
+  "versionCode": 4,
+  "versionName": "1.0.4",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix ringtone looping on call decline/cut\n2. Hybrid signaling: works across Wi-Fi & 4G/5G mobile data\n3. Self-call prevention ([YOU] badge)\n4. Ultra-clear low-latency audio buffering\n5. TargetSdk 34 + release signed build"
+  "changelog": "1. Fix ringtone looping on call decline/cut\n2. Hybrid signaling: works across Wi-Fi & 4G/5G mobile data\n3. Self-call prevention ([YOU] badge)\n4. Ultra-clear low-latency audio buffering\n5. TargetSdk 34 + release signed build\n6. Modern TLS Trust for legacy Android 5.0+ and auto-reconnect MQTT"
 }

@@ -40,7 +40,8 @@ public class CallSignaling {
     public static final int DISCOVERY_PORT = 50621;
     public static final int AUDIO_PORT = 50622;
 
-    private static final String MQTT_BROKER = "tcp://broker.emqx.io:1883";
+    private static final String MQTT_BROKER = "tcp://broker.hivemq.com:1883";
+    private static final String MQTT_BROKER_BACKUP = "tcp://broker.emqx.io:1883";
     private static final String TOPIC_PREFIX = "wificalling/call/";
     private static final String PRESENCE_PREFIX = "wificalling/presence/";
 
@@ -121,42 +122,64 @@ public class CallSignaling {
     }
 
     private void initMqtt() {
-        try {
-            String clientId = "WiFiPhone_" + myExtId + "_" + System.currentTimeMillis() % 10000;
-            mqttClient = new MqttClient(MQTT_BROKER, clientId, new MemoryPersistence());
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setAutomaticReconnect(true);
-            options.setCleanSession(true);
-            options.setConnectionTimeout(10);
-            options.setKeepAliveInterval(20);
+        String[] brokers = new String[]{MQTT_BROKER, MQTT_BROKER_BACKUP};
+        int brokerIdx = 0;
 
-            mqttClient.setCallback(new MqttCallback() {
-                @Override
-                public void connectionLost(Throwable cause) {
-                    Log.w(TAG, "MQTT connection lost, will auto-reconnect");
+        while (isRunning) {
+            try {
+                if (mqttClient == null || !mqttClient.isConnected()) {
+                    String currentBroker = brokers[brokerIdx % brokers.length];
+                    String clientId = "WiFiPhone_" + myExtId + "_" + (System.currentTimeMillis() % 100000);
+
+                    if (mqttClient != null) {
+                        try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
+                        try { mqttClient.close(); } catch (Throwable ignored) {}
+                    }
+
+                    mqttClient = new MqttClient(currentBroker, clientId, new MemoryPersistence());
+                    MqttConnectOptions options = new MqttConnectOptions();
+                    options.setAutomaticReconnect(true);
+                    options.setCleanSession(true);
+                    options.setConnectionTimeout(8);
+                    options.setKeepAliveInterval(20);
+
+                    mqttClient.setCallback(new MqttCallback() {
+                        @Override
+                        public void connectionLost(Throwable cause) {
+                            Log.w(TAG, "MQTT connection lost, will reconnect");
+                        }
+
+                        @Override
+                        public void messageArrived(String topic, MqttMessage message) {
+                            handleMqttMessage(topic, new String(message.getPayload()));
+                        }
+
+                        @Override
+                        public void deliveryComplete(IMqttDeliveryToken token) {}
+                    });
+
+                    Log.i(TAG, "Connecting to MQTT broker: " + currentBroker);
+                    mqttClient.connect(options);
+                    Log.i(TAG, "Connected to MQTT broker successfully!");
+
+                    // Subscribe to personal incoming calls
+                    mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
+
+                    // Subscribe to all presence updates
+                    mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
+
+                    publishPresence();
+                    break;
                 }
-
-                @Override
-                public void messageArrived(String topic, MqttMessage message) {
-                    handleMqttMessage(topic, new String(message.getPayload()));
+            } catch (Throwable e) {
+                Log.w(TAG, "MQTT connect attempt failed, retrying in 4s: " + e.getMessage());
+                brokerIdx++;
+                try {
+                    Thread.sleep(4000);
+                } catch (InterruptedException ie) {
+                    break;
                 }
-
-                @Override
-                public void deliveryComplete(IMqttDeliveryToken token) {}
-            });
-
-            mqttClient.connect(options);
-            Log.i(TAG, "Connected to MQTT broker successfully!");
-
-            // Subscribe to personal incoming calls
-            mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
-
-            // Subscribe to all presence updates
-            mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
-
-            publishPresence();
-        } catch (Exception e) {
-            Log.e(TAG, "MQTT init error: " + e.getMessage());
+            }
         }
     }
 
