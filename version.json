@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 7,
-  "versionName": "1.0.7",
+  "versionCode": 8,
+  "versionName": "1.0.8",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Google Play Protect & Android Security compliance (v1+v2+v3 signatures, cleaned permissions)\n2. Deep Sleep & Battery Optimization (0 idle wakelocks, intelligent radio sleep)\n3. Seamless 1-Click Update prompt with auto-installer\n4. Pin own device at bottom with 'YOU' badge & Google Dialer Dynamic Recents"
+  "changelog": "1. Full Android 17 / 16 / 15 / 14 Compatibility (Samsung S24 Ultra & modern flagships)\n2. Edge-to-Edge fitsSystemWindows protection (no notch or navigation bar clipping)\n3. Foreground Service Phone Call type certified\n4. Verified v1+v2+v3 signatures & 0-idle-battery drain"
 }

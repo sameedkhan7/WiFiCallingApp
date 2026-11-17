@@ -61,7 +61,7 @@
             android:name=".service.CallBackgroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|dataSync" />
+            android:foregroundServiceType="phoneCall|connectedDevice|dataSync" />
 
         <!-- FileProvider for In-App Auto-Updates -->
         <provider

@@ -529,7 +529,7 @@ public class MainActivity extends Activity {
                      "Extension ID: " + myExtId + "\n" +
                      "Network: " + getNetworkStatusString() + "\n" +
                      "Public WAN: " + (CallSignaling.myPublicEndpoint.isEmpty() ? "Discovering..." : CallSignaling.myPublicEndpoint) + "\n" +
-                     "Version: v1.0.7 (Ultra-Lightweight & Battery-Optimized)\n" +
+                     "Version: v1.0.8 (Android 14-17 Ready • Edge-to-Edge)\n" +
                      "Signaling: HiveMQ + P2P Direct\n" +
                      "Encryption: AES-256 Military Grade";
         builder.setMessage(msg);
