@@ -155,9 +155,10 @@ public class MainActivity extends Activity {
             tvMyDeviceIp.setText(getNetworkStatusString());
         }
 
-        // Announce presence immediately on app resume
+        // Announce presence immediately on app resume and ensure signaling is started
         try {
             CallSignaling sig = new CallSignaling(this, null);
+            sig.start();
             sig.broadcastPresence();
             sig.publishPresence();
         } catch (Throwable ignored) {}
@@ -533,13 +534,17 @@ public class MainActivity extends Activity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Settings & Profile");
 
-        String msg = "Phone: " + Build.MODEL + "\n" +
-                     "Extension ID: " + myExtId + "\n" +
+        String verName = "1.1.2";
+        try {
+            verName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {}
+        String msg = "Device Model: " + Build.MODEL + "\n" +
+                     "Current Extension: " + myExtId + "\n" +
                      "Network: " + getNetworkStatusString() + "\n" +
                      "Public WAN: " + (CallSignaling.myPublicEndpoint.isEmpty() ? "Discovering..." : CallSignaling.myPublicEndpoint) + "\n" +
-                     "Version: v1.0.9 (Triple-Redundant Calling • Instant Discovery)\n" +
-                     "Signaling: HiveMQ + P2P Direct\n" +
-                     "Encryption: AES-256 Military Grade";
+                     "Version: v" + verName + " (Universal Redundant Calling)\n" +
+                     "Signaling: HiveMQ + Mosquitto (Dual Failover)\n" +
+                     "Encryption: AES-256 Universal Military Grade";
         builder.setMessage(msg);
 
         builder.setPositiveButton("Check Updates", (dialog, which) -> {
@@ -547,7 +552,49 @@ public class MainActivity extends Activity {
             UpdateManager.checkUpdate(this, true);
         });
 
+        builder.setNeutralButton("Change Device ID", (dialog, which) -> showDeviceSelectorDialog());
+
         builder.setNegativeButton("Close", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private void showDeviceSelectorDialog() {
+        String[] devices = new String[]{
+                "Home Vivo Y51L (Ext 101)",
+                "My OnePlus Main (Ext 102)",
+                "Samsung Galaxy S24 Ultra (Ext 103)",
+                "Samsung Galaxy M35 5G (Ext 104)"
+        };
+        final String[] extMap = new String[]{"101", "102", "103", "104"};
+
+        int selectedIdx = 0;
+        for (int i = 0; i < extMap.length; i++) {
+            if (extMap[i].equals(myExtId)) {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Select Which Device This Is");
+        builder.setSingleChoiceItems(devices, selectedIdx, (dialog, which) -> {
+            String newExt = extMap[which];
+            prefs.edit().putString("SAVED_MY_EXT_ID", newExt).apply();
+            myExtId = newExt;
+            Toast.makeText(this, "Device ID set to: " + devices[which], Toast.LENGTH_LONG).show();
+            dialog.dismiss();
+
+            loadContacts();
+            renderContactsUI();
+
+            try {
+                CallSignaling sig = new CallSignaling(this, null);
+                sig.start();
+                sig.publishPresence();
+                sig.broadcastPresence();
+            } catch (Throwable ignored) {}
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
         builder.show();
     }
 

@@ -833,7 +833,6 @@ id tvCallerName
 id tvInCallName
 id tvInCallStatus
 id tvMyDeviceIp
-id tvMyDeviceName
 id unchecked
 id uniform
 id up

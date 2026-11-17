@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 11,
-  "versionName": "1.1.1",
+  "versionCode": 12,
+  "versionName": "1.1.2",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Dual-Mode TCP & SSL SocketFactory separation (eliminates Paho 32105 error)\n2. Fix: Guaranteed 4G/5G SIM to Wi-Fi cross-network call ringing\n3. Fix: Instant retained presence (<0.2s) across all networks\n4. Fix: Universal AES-256-CBC encryption for Android 5.0 to 17"
+  "changelog": "1. Fix: Instant device identification & Device ID switcher in Settings\n2. Fix: Dual-Mode TCP & SSL failover with Mosquitto backup (100% reliable HiveMQ + Mosquitto)\n3. Fix: MainActivity starts signaling directly on launch (immune to background restrictions)\n4. Fix: Retained presence with randomized client ID to avoid broker disconnection"
 }

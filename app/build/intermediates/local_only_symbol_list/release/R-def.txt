@@ -26,7 +26,6 @@ id tvCallerName
 id tvInCallName
 id tvInCallStatus
 id tvMyDeviceIp
-id tvMyDeviceName
 layout activity_in_call
 layout activity_incoming_call
 layout activity_main

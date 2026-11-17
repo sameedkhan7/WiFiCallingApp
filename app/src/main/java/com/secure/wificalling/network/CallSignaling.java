@@ -1,6 +1,7 @@
 package com.secure.wificalling.network;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.net.DhcpInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -36,10 +37,10 @@ import javax.net.ssl.X509TrustManager;
 
 /**
  * Universal Resilient P2P & Cloud Hybrid Signaling Engine:
- * 1. Clean Dual-Mode Multi-Broker Failover (TCP 1883 + SSL/TLS 8883).
+ * 1. Clean Dual-Mode Multi-Broker Failover (HiveMQ + Mosquitto TCP 1883 + SSL 8883).
  * 2. Guaranteed cross-network signaling (Cellular 4G/5G <-> Wi-Fi).
  * 3. Retained presence architecture: Instant online detection in <0.2s.
- * 4. 100% Android 5.0 (Vivo Y51L) to Android 17 (S24 Ultra / OnePlus) compatibility.
+ * 4. User-configurable extension ID & 100% Android 5.0 (Vivo Y51L) to Android 17 compatibility.
  */
 public class CallSignaling {
 
@@ -50,12 +51,12 @@ public class CallSignaling {
 
     private static final String[] TCP_BROKERS = {
         "tcp://broker.hivemq.com:1883",
-        "tcp://broker.emqx.io:1883"
+        "tcp://test.mosquitto.org:1883"
     };
 
     private static final String[] SSL_BROKERS = {
         "ssl://broker.hivemq.com:8883",
-        "ssl://broker.emqx.io:8883"
+        "ssl://test.mosquitto.org:8883"
     };
 
     private static final String TOPIC_PREFIX = "wificall_sk_v6/call/";
@@ -109,7 +110,7 @@ public class CallSignaling {
         if (listener != null && !listeners.contains(listener)) {
             listeners.add(listener);
         }
-        this.myExtId = detectMyExtensionId();
+        this.myExtId = detectMyExtensionId(context);
     }
 
     public void removeListener(CallListener listener) {
@@ -118,9 +119,20 @@ public class CallSignaling {
         }
     }
 
-    public static String detectMyExtensionId() {
+    public static String detectMyExtensionId(Context context) {
+        if (context != null) {
+            try {
+                SharedPreferences prefs = context.getSharedPreferences("WiFiCallingPrefs", Context.MODE_PRIVATE);
+                String saved = prefs.getString("SAVED_MY_EXT_ID", null);
+                if (saved != null && !saved.trim().isEmpty()) {
+                    return saved.trim();
+                }
+            } catch (Throwable ignored) {}
+        }
+
         String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
-        if (info.contains("vivo") || info.contains("y51l") || info.contains("pd1510")) {
+        if (info.contains("vivo") || info.contains("y51") || info.contains("pd1510") || info.contains("bbk") ||
+            info.contains("1510") || info.contains("1601") || info.contains("1603") || info.contains("1606")) {
             return "101"; // Vivo Y51L (Home Phone)
         } else if (info.contains("cph2381") || info.contains("oneplus") || info.contains("nord") || info.contains("oppo")) {
             return "102"; // OnePlus Nord CE 2 Lite (CPH2381)
@@ -129,7 +141,11 @@ public class CallSignaling {
         } else if (info.contains("m35") || info.contains("sm-m35") || info.contains("m356")) {
             return "104"; // Samsung Galaxy M35 5G
         }
-        return "102"; // Default
+        return "101"; // Fallback to Vivo (101) so it never clashes with OnePlus (102)
+    }
+
+    public static String detectMyExtensionId() {
+        return detectMyExtensionId(null);
     }
 
     public static String getPeerPublicEndpoint(String ext) {
@@ -218,7 +234,8 @@ public class CallSignaling {
                     mqttClient = null;
                 }
 
-                String clientId = "WiFiPhone_SK_v6_" + myExtId;
+                // Unique ClientID with random salt to avoid any broker kicking
+                String clientId = "WiFiPhone_SK_v6_" + myExtId + "_" + (System.currentTimeMillis() % 10000);
                 boolean connected = false;
 
                 // 1. Try TCP Broker first (Fastest on Wi-Fi)

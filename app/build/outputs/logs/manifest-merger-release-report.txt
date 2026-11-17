@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-81:12
-INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-81:12
-INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-81:12
-INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-81:12
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-79:12
+INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-79:12
+INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-79:12
+INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:2:1-79:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\SK\.gradle\caches\transforms-4\4aaad53ac048def513c75a0f586ed32d\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\SK\.gradle\caches\transforms-4\149f59938b35074dc7fe35e9f9516797\transformed\appcompat-1.6.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\SK\.gradle\caches\transforms-4\fcf2d4df9b8365e6d05a0a6a9a9967f2\transformed\fragment-1.3.6\AndroidManifest.xml:17:1-24:12
@@ -72,49 +72,41 @@ uses-permission#android.permission.VIBRATE
 ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:12:5-66
 	android:name
 		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:12:22-63
-uses-permission#android.permission.DISABLE_KEYGUARD
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:5-75
-	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:22-72
-uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:14:5-81
-	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:14:22-78
 uses-permission#android.permission.USE_FULL_SCREEN_INTENT
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:15:5-81
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:5-81
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:15:22-78
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:13:22-78
 uses-permission#android.permission.FOREGROUND_SERVICE
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:5-77
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:16:5-77
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:22-74
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:16:22-74
 uses-permission#android.permission.FOREGROUND_SERVICE_PHONE_CALL
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:5-88
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:17:5-88
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:22-85
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:17:22-85
 uses-permission#android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:5-94
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:5-94
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:22-91
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:18:22-91
 uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:5-87
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:5-87
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:22-84
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:19:22-84
 uses-permission#android.permission.MANAGE_OWN_CALLS
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:5-75
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:5-75
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:22-72
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:20:22-72
 uses-permission#android.permission.POST_NOTIFICATIONS
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:23:5-77
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:5-77
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:23:22-74
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:21:22-74
 uses-permission#android.permission.REQUEST_INSTALL_PACKAGES
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:5-83
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:5-83
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:22-80
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:22:22-80
 application
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:26:5-79:19
-INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:26:5-79:19
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:5-77:19
+INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:24:5-77:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\SK\.gradle\caches\transforms-4\e7ff612629f292296c6825d51d0fe33d\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:28:5-89
@@ -130,85 +122,85 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\SK\.gradle\caches\
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.12.0] C:\Users\SK\.gradle\caches\transforms-4\a65d085d398b8c635743653a920b8cb3\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
 	android:label
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:29:9-36
-	android:icon
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:28:9-57
-	android:allowBackup
 		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:27:9-36
+	android:icon
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:26:9-57
+	android:allowBackup
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:25:9-36
 	android:theme
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:30:9-49
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:28:9-49
 	android:usesCleartextTraffic
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:31:9-44
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:29:9-44
 activity#com.secure.wificalling.ui.MainActivity
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:34:9-42:20
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:32:9-40:20
 	android:launchMode
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:37:13-43
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:35:13-43
 	android:exported
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:36:13-36
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:34:13-36
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:35:13-44
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:33:13-44
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:38:13-41:29
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:36:13-39:29
 action#android.intent.action.MAIN
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:39:17-69
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:37:17-69
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:39:25-66
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:37:25-66
 category#android.intent.category.LAUNCHER
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:40:17-77
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:38:17-77
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:40:27-74
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:38:27-74
 activity#com.secure.wificalling.ui.IncomingCallActivity
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:45:9-52:52
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:43:9-50:52
 	android:screenOrientation
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:52:13-49
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:50:13-49
 	android:turnScreenOn
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:50:13-40
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:48:13-40
 	android:excludeFromRecents
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:51:13-46
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:49:13-46
 	android:launchMode
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:48:13-43
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:46:13-43
 	android:exported
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:47:13-37
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:45:13-37
 	android:showOnLockScreen
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:49:13-44
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:47:13-44
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:46:13-52
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:44:13-52
 activity#com.secure.wificalling.ui.InCallActivity
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:55:9-59:52
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:53:9-57:52
 	android:screenOrientation
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:59:13-49
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:57:13-49
 	android:launchMode
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:58:13-43
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:56:13-43
 	android:exported
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:57:13-37
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:55:13-37
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:56:13-46
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:54:13-46
 service#com.secure.wificalling.service.CallBackgroundService
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:62:9-66:72
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:60:9-64:82
 	android:enabled
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:64:13-35
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:62:13-35
 	android:exported
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:65:13-37
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:63:13-37
 	android:foregroundServiceType
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:66:13-69
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:64:13-79
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:63:13-58
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:61:13-58
 provider#androidx.core.content.FileProvider
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:69:9-77:20
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:67:9-75:20
 	android:grantUriPermissions
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:73:13-47
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:71:13-47
 	android:authorities
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:71:13-70
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:69:13-70
 	android:exported
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:72:13-37
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:70:13-37
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:70:13-62
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:68:13-62
 meta-data#android.support.FILE_PROVIDER_PATHS
-ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:74:13-76:54
+ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:72:13-74:54
 	android:resource
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:76:17-51
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:74:17-51
 	android:name
-		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:75:17-67
+		ADDED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml:73:17-67
 uses-sdk
 INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\SK\.gemini\antigravity\scratch\WiFiCallingApp\app\src\main\AndroidManifest.xml
