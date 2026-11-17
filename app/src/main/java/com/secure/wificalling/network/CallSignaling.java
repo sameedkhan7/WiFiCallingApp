@@ -36,7 +36,7 @@ import javax.net.ssl.X509TrustManager;
 
 /**
  * Universal Resilient P2P & Cloud Hybrid Signaling Engine:
- * 1. Multi-Broker Redundancy (HiveMQ + EMQX) with SSL/TLS and TCP fallback.
+ * 1. Clean Dual-Mode Multi-Broker Failover (TCP 1883 + SSL/TLS 8883).
  * 2. Guaranteed cross-network signaling (Cellular 4G/5G <-> Wi-Fi).
  * 3. Retained presence architecture: Instant online detection in <0.2s.
  * 4. 100% Android 5.0 (Vivo Y51L) to Android 17 (S24 Ultra / OnePlus) compatibility.
@@ -48,9 +48,12 @@ public class CallSignaling {
     public static final int DISCOVERY_PORT = 50621;
     public static final int AUDIO_PORT = 50622;
 
-    private static final String[] MQTT_BROKERS = {
+    private static final String[] TCP_BROKERS = {
         "tcp://broker.hivemq.com:1883",
-        "tcp://broker.emqx.io:1883",
+        "tcp://broker.emqx.io:1883"
+    };
+
+    private static final String[] SSL_BROKERS = {
         "ssl://broker.hivemq.com:8883",
         "ssl://broker.emqx.io:8883"
     };
@@ -216,54 +219,96 @@ public class CallSignaling {
                 }
 
                 String clientId = "WiFiPhone_SK_v6_" + myExtId;
-                mqttClient = new MqttClient(MQTT_BROKERS[0], clientId, new MemoryPersistence());
+                boolean connected = false;
 
-                MqttConnectOptions options = new MqttConnectOptions();
-                options.setServerURIs(MQTT_BROKERS);
-                options.setSocketFactory(getPermissiveSSLSocketFactory());
-                options.setAutomaticReconnect(true);
-                options.setCleanSession(true);
-                options.setConnectionTimeout(6);
-                options.setKeepAliveInterval(30);
+                // 1. Try TCP Broker first (Fastest on Wi-Fi)
+                try {
+                    mqttClient = new MqttClient(TCP_BROKERS[0], clientId, new MemoryPersistence());
+                    MqttConnectOptions options = new MqttConnectOptions();
+                    options.setServerURIs(TCP_BROKERS);
+                    options.setAutomaticReconnect(true);
+                    options.setCleanSession(true);
+                    options.setConnectionTimeout(4);
+                    options.setKeepAliveInterval(30);
 
-                // Set LWT (Last Will & Testament) so broker notifies peers if device loses internet abruptly
-                JSONObject offlineObj = new JSONObject();
-                offlineObj.put("ext", myExtId);
-                offlineObj.put("status", "offline");
-                options.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
+                    JSONObject offlineObj = new JSONObject();
+                    offlineObj.put("ext", myExtId);
+                    offlineObj.put("status", "offline");
+                    options.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
 
-                mqttClient.setCallback(new MqttCallbackExtended() {
-                    @Override
-                    public void connectComplete(boolean reconnect, String serverURI) {
-                        Log.i(TAG, "MQTT connectComplete (reconnect=" + reconnect + ") to " + serverURI);
-                        subscribeAllTopics();
-                        publishPresence();
+                    attachMqttCallback(mqttClient);
+                    Log.i(TAG, "Connecting to MQTT TCP brokers: " + TCP_BROKERS[0]);
+                    mqttClient.connect(options);
+                    connected = mqttClient.isConnected();
+                    Log.i(TAG, "Connected to MQTT TCP broker successfully!");
+                } catch (Throwable tcpEx) {
+                    Log.w(TAG, "MQTT TCP connect failed: " + tcpEx.getMessage() + ", trying SSL fallback...");
+                }
+
+                // 2. Fallback to SSL/TLS if TCP failed (Crucial for Cellular 4G/5G data networks)
+                if (!connected) {
+                    try {
+                        if (mqttClient != null) {
+                            try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
+                            try { mqttClient.close(); } catch (Throwable ignored) {}
+                        }
+                        mqttClient = new MqttClient(SSL_BROKERS[0], clientId, new MemoryPersistence());
+                        MqttConnectOptions sslOptions = new MqttConnectOptions();
+                        sslOptions.setServerURIs(SSL_BROKERS);
+                        sslOptions.setSocketFactory(getPermissiveSSLSocketFactory());
+                        sslOptions.setAutomaticReconnect(true);
+                        sslOptions.setCleanSession(true);
+                        sslOptions.setConnectionTimeout(5);
+                        sslOptions.setKeepAliveInterval(30);
+
+                        JSONObject offlineObj = new JSONObject();
+                        offlineObj.put("ext", myExtId);
+                        offlineObj.put("status", "offline");
+                        sslOptions.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
+
+                        attachMqttCallback(mqttClient);
+                        Log.i(TAG, "Connecting to MQTT SSL brokers: " + SSL_BROKERS[0]);
+                        mqttClient.connect(sslOptions);
+                        connected = mqttClient.isConnected();
+                        Log.i(TAG, "Connected to MQTT SSL broker successfully!");
+                    } catch (Throwable sslEx) {
+                        Log.w(TAG, "MQTT SSL connect failed: " + sslEx.getMessage());
                     }
+                }
 
-                    @Override
-                    public void connectionLost(Throwable cause) {
-                        Log.w(TAG, "MQTT connection lost: " + (cause != null ? cause.getMessage() : "unknown"));
-                    }
-
-                    @Override
-                    public void messageArrived(String topic, MqttMessage message) {
-                        handleMqttMessage(topic, new String(message.getPayload(), StandardCharsets.UTF_8));
-                    }
-
-                    @Override
-                    public void deliveryComplete(IMqttDeliveryToken token) {}
-                });
-
-                Log.i(TAG, "Connecting to MQTT brokers: HiveMQ / EMQX...");
-                mqttClient.connect(options);
-                Log.i(TAG, "Connected to MQTT broker successfully!");
-
-                subscribeAllTopics();
-                publishPresence();
+                if (connected) {
+                    subscribeAllTopics();
+                    publishPresence();
+                }
             } catch (Throwable t) {
                 Log.w(TAG, "MQTT connect attempt failed: " + t.getMessage());
             }
         }
+    }
+
+    private void attachMqttCallback(MqttClient client) {
+        if (client == null) return;
+        client.setCallback(new MqttCallbackExtended() {
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                Log.i(TAG, "MQTT connectComplete (reconnect=" + reconnect + ") to " + serverURI);
+                subscribeAllTopics();
+                publishPresence();
+            }
+
+            @Override
+            public void connectionLost(Throwable cause) {
+                Log.w(TAG, "MQTT connection lost: " + (cause != null ? cause.getMessage() : "unknown"));
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) {
+                handleMqttMessage(topic, new String(message.getPayload(), StandardCharsets.UTF_8));
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {}
+        });
     }
 
     private void subscribeAllTopics() {

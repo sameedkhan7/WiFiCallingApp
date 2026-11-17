@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 10,
-  "versionName": "1.1.0",
+  "versionCode": 11,
+  "versionName": "1.1.1",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Universal AES-256-CBC End-to-End Encryption compatible across Android 5.0 to 17\n2. Fix: Multi-Broker failover (HiveMQ + EMQX) with TLS port 8883 support for 4G/5G cellular data\n3. Fix: Instant retained presence (<0.2s) - eliminates false offline status\n4. Fix: Synchronized MQTT connection & callback registration for guaranteed call ringing"
+  "changelog": "1. Fix: Dual-Mode TCP & SSL SocketFactory separation (eliminates Paho 32105 error)\n2. Fix: Guaranteed 4G/5G SIM to Wi-Fi cross-network call ringing\n3. Fix: Instant retained presence (<0.2s) across all networks\n4. Fix: Universal AES-256-CBC encryption for Android 5.0 to 17"
 }
