@@ -10,8 +10,8 @@ android {
         applicationId "com.secure.wificalling"
         minSdk 21        // Android 5.0 (Vivo Y51L)
         targetSdk 34     // Android 14+ Native (OnePlus, Samsung S24 Ultra, M35)
-        versionCode 6
-        versionName "1.0.6"
+        versionCode 7
+        versionName "1.0.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,6 +24,8 @@ android {
             keyPassword "SecureWiFi2026"
             v1SigningEnabled true
             v2SigningEnabled true
+            enableV3Signing true
+            enableV4Signing true
         }
     }
 

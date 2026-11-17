@@ -54,33 +54,19 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         super.onCreate();
         instance = this;
         try {
-            acquireLocks();
             startForegroundServiceNotification();
 
             signaling = new CallSignaling(this, this);
             signaling.start();
-            Log.i(TAG, "CallBackgroundService active 24/7.");
+            Log.i(TAG, "CallBackgroundService active 24/7 (Battery-Optimized).");
         } catch (Throwable t) {
             Log.e(TAG, "onCreate error", t);
         }
     }
 
     private void acquireLocks() {
-        try {
-            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:ServiceWakeLock");
-                wakeLock.acquire();
-            }
-        } catch (Throwable ignored) {}
-
-        try {
-            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            if (wm != null) {
-                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
-                wifiLock.acquire();
-            }
-        } catch (Throwable ignored) {}
+        // Battery Optimization: Idle CPU/Wi-Fi locks removed.
+        // Temporary wakelocks are only acquired on active incoming calls.
     }
 
     private void startForegroundServiceNotification() {

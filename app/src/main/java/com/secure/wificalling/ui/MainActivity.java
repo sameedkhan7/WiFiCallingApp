@@ -72,6 +72,19 @@ public class MainActivity extends Activity {
     private TextView tvMyDeviceIp;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
     private String myExtId;
+    private boolean isActivityResumed = false;
+
+    private final Runnable refreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isActivityResumed) return;
+            renderContactsUI();
+            if (tvMyDeviceIp != null) {
+                tvMyDeviceIp.setText(getNetworkStatusString());
+            }
+            mainHandler.postDelayed(this, 5000);
+        }
+    };
 
     public static void recordInteraction(Context context, String ext) {
         if (context == null || ext == null || ext.isEmpty()) return;
@@ -135,11 +148,21 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        isActivityResumed = true;
         loadContacts();
         renderContactsUI();
         if (tvMyDeviceIp != null) {
             tvMyDeviceIp.setText(getNetworkStatusString());
         }
+        mainHandler.removeCallbacks(refreshRunnable);
+        mainHandler.postDelayed(refreshRunnable, 5000);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isActivityResumed = false;
+        mainHandler.removeCallbacks(refreshRunnable);
     }
 
     private String getNetworkStatusString() {
@@ -298,7 +321,7 @@ public class MainActivity extends Activity {
             tvStatus.setTextColor(Color.parseColor("#34A853"));
         } else {
             CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
-            boolean isOnline = (ps != null && (System.currentTimeMillis() - ps.lastSeen < 25000));
+            boolean isOnline = (ps != null && (System.currentTimeMillis() - ps.lastSeen < 65000));
             if (isOnline) {
                 String ipPart = (!ps.localIp.isEmpty() && !ps.localIp.equals("127.0.0.1")) ? ": " + ps.localIp : "";
                 tvStatus.setText("🟢 Online (" + ps.networkType + ipPart + ")");
@@ -506,7 +529,7 @@ public class MainActivity extends Activity {
                      "Extension ID: " + myExtId + "\n" +
                      "Network: " + getNetworkStatusString() + "\n" +
                      "Public WAN: " + (CallSignaling.myPublicEndpoint.isEmpty() ? "Discovering..." : CallSignaling.myPublicEndpoint) + "\n" +
-                     "Version: v1.0.6 (Hybrid Wi-Fi + 5G)\n" +
+                     "Version: v1.0.7 (Ultra-Lightweight & Battery-Optimized)\n" +
                      "Signaling: HiveMQ + P2P Direct\n" +
                      "Encryption: AES-256 Military Grade";
         builder.setMessage(msg);
@@ -521,16 +544,7 @@ public class MainActivity extends Activity {
     }
 
     private void startPeriodicStatusRefresh() {
-        mainHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                renderContactsUI();
-                if (tvMyDeviceIp != null) {
-                    tvMyDeviceIp.setText(getNetworkStatusString());
-                }
-                mainHandler.postDelayed(this, 3000);
-            }
-        }, 3000);
+        // Handled dynamically in onResume and onPause to save battery
     }
 
     private boolean hasAllPermissions() {

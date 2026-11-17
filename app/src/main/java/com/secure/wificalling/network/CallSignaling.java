@@ -145,7 +145,7 @@ public class CallSignaling {
             } catch (Exception ignored) {}
 
             try {
-                Thread.sleep(30000);
+                Thread.sleep(120000);
             } catch (InterruptedException ie) {
                 break;
             }
@@ -167,8 +167,8 @@ public class CallSignaling {
                     MqttConnectOptions options = new MqttConnectOptions();
                     options.setAutomaticReconnect(true);
                     options.setCleanSession(true);
-                    options.setConnectionTimeout(10);
-                    options.setKeepAliveInterval(15);
+                    options.setConnectionTimeout(15);
+                    options.setKeepAliveInterval(60);
 
                     mqttClient.setCallback(new MqttCallbackExtended() {
                         @Override
@@ -221,8 +221,8 @@ public class CallSignaling {
                 MqttConnectOptions options = new MqttConnectOptions();
                 options.setAutomaticReconnect(true);
                 options.setCleanSession(true);
-                options.setConnectionTimeout(6);
-                options.setKeepAliveInterval(15);
+                options.setConnectionTimeout(10);
+                options.setKeepAliveInterval(60);
                 mqttClient.connect(options);
                 mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
@@ -293,7 +293,7 @@ public class CallSignaling {
             try {
                 publishPresence();
                 broadcastPresence();
-                Thread.sleep(4000);
+                Thread.sleep(25000); // 25s interval to save battery and reduce radio wakeups
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {}

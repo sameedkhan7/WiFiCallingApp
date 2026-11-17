@@ -181,6 +181,17 @@ public class UpdateManager {
 
     private static void installApk(Context context, File apkFile) {
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.getPackageManager().canRequestPackageInstalls()) {
+                    Intent manageIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                    manageIntent.setData(Uri.parse("package:" + context.getPackageName()));
+                    manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(manageIntent);
+                    Toast.makeText(context, "Please enable 'Allow from this source' to update", Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+
             Intent intent = new Intent(Intent.ACTION_VIEW);
             Uri apkUri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
