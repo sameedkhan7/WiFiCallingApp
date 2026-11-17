@@ -48,6 +48,11 @@ public class VoiceEngine {
 
     private volatile InetAddress targetAddress;
     private volatile int targetPort = CallSignaling.AUDIO_PORT;
+    private volatile InetAddress lanTargetAddress;
+    private volatile int lanTargetPort = CallSignaling.AUDIO_PORT;
+    private volatile InetAddress wanTargetAddress;
+    private volatile int wanTargetPort = CallSignaling.AUDIO_PORT;
+    private volatile boolean hasLockedTarget = false;
 
     public VoiceEngine(Context context) {
         this.context = context;
@@ -58,6 +63,7 @@ public class VoiceEngine {
         this.remoteIp = remoteIp;
         this.remotePublicEndpoint = remotePublicEndpoint;
         this.isCalling = true;
+        this.hasLockedTarget = false;
 
         AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         if (audioManager != null) {
@@ -79,19 +85,27 @@ public class VoiceEngine {
             } catch (Exception ignored) {}
         }
 
-        // Initialize target address candidates
+        // Initialize target address candidates (both LAN and WAN)
         try {
             if (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.equals("127.0.0.1") && !remoteIp.isEmpty()) {
-                targetAddress = InetAddress.getByName(remoteIp);
-                targetPort = CallSignaling.AUDIO_PORT;
-            } else if (remotePublicEndpoint != null && remotePublicEndpoint.contains(":")) {
-                String[] parts = remotePublicEndpoint.split(":");
-                targetAddress = InetAddress.getByName(parts[0]);
-                targetPort = Integer.parseInt(parts[1]);
+                lanTargetAddress = InetAddress.getByName(remoteIp);
+                lanTargetPort = CallSignaling.AUDIO_PORT;
+                targetAddress = lanTargetAddress;
+                targetPort = lanTargetPort;
             }
-        } catch (Exception e) {
-            Log.w(TAG, "Target address resolution: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
+
+        try {
+            if (remotePublicEndpoint != null && remotePublicEndpoint.contains(":")) {
+                String[] parts = remotePublicEndpoint.split(":");
+                wanTargetAddress = InetAddress.getByName(parts[0]);
+                wanTargetPort = Integer.parseInt(parts[1]);
+                if (targetAddress == null) {
+                    targetAddress = wanTargetAddress;
+                    targetPort = wanTargetPort;
+                }
+            }
+        } catch (Exception ignored) {}
 
         // Punch NAT holes concurrently
         new Thread(this::punchNatHoles, "NatHolePunchThread").start();
@@ -114,22 +128,18 @@ public class VoiceEngine {
             java.util.Arrays.fill(punchBytes, (byte) 0xAA);
 
             // 2. Blast hole punch packets to both local IP and public WAN endpoint
-            for (int i = 0; i < 8 && isCalling; i++) {
-                if (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.equals("127.0.0.1") && !remoteIp.isEmpty()) {
+            for (int i = 0; i < 12 && isCalling; i++) {
+                if (lanTargetAddress != null) {
                     try {
-                        InetAddress lanAddr = InetAddress.getByName(remoteIp);
-                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, lanAddr, CallSignaling.AUDIO_PORT));
+                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, lanTargetAddress, lanTargetPort));
                     } catch (Exception ignored) {}
                 }
-                if (remotePublicEndpoint != null && remotePublicEndpoint.contains(":")) {
+                if (wanTargetAddress != null) {
                     try {
-                        String[] parts = remotePublicEndpoint.split(":");
-                        InetAddress wanAddr = InetAddress.getByName(parts[0]);
-                        int wanPort = Integer.parseInt(parts[1]);
-                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, wanAddr, wanPort));
+                        sharedUdpSocket.send(new DatagramPacket(punchBytes, punchBytes.length, wanTargetAddress, wanTargetPort));
                     } catch (Exception ignored) {}
                 }
-                Thread.sleep(120);
+                Thread.sleep(100);
             }
         } catch (Exception ignored) {}
     }
@@ -175,9 +185,21 @@ public class VoiceEngine {
 
                     CryptoUtil.encryptAudioBuffer(frame, 0, FRAME_SIZE);
 
-                    if (targetAddress != null && sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
-                        DatagramPacket packet = new DatagramPacket(frame, FRAME_SIZE, targetAddress, targetPort);
-                        sharedUdpSocket.send(packet);
+                    if (sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
+                        // 1. Send to primary / locked target
+                        if (targetAddress != null) {
+                            try {
+                                DatagramPacket packet = new DatagramPacket(frame, FRAME_SIZE, targetAddress, targetPort);
+                                sharedUdpSocket.send(packet);
+                            } catch (Exception ignored) {}
+                        }
+                        // 2. Until symmetric lock is confirmed, concurrently stream to WAN target as well
+                        if (!hasLockedTarget && wanTargetAddress != null && (!wanTargetAddress.equals(targetAddress) || wanTargetPort != targetPort)) {
+                            try {
+                                DatagramPacket wanPacket = new DatagramPacket(frame, FRAME_SIZE, wanTargetAddress, wanTargetPort);
+                                sharedUdpSocket.send(wanPacket);
+                            } catch (Exception ignored) {}
+                        }
                     }
                 }
             }
@@ -218,6 +240,7 @@ public class VoiceEngine {
                         // Symmetric Reflection: Lock return traffic directly to sender
                         targetAddress = packet.getAddress();
                         targetPort = packet.getPort();
+                        hasLockedTarget = true;
 
                         CryptoUtil.decryptAudioBuffer(inBuffer, 0, len);
                         audioTrack.write(inBuffer, 0, len);

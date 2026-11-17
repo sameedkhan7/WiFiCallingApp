@@ -2,7 +2,9 @@ package com.secure.wificalling.network;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
+import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.util.Log;
@@ -20,12 +22,16 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -194,11 +200,12 @@ public class CallSignaling {
                 if (res != null) {
                     myPublicEndpoint = res.publicIp + ":" + res.publicPort;
                     Log.i(TAG, "Discovered WAN Public Endpoint: " + myPublicEndpoint);
+                    publishPresence();
                 }
             } catch (Exception ignored) {}
 
             try {
-                Thread.sleep(120000);
+                Thread.sleep(60000);
             } catch (InterruptedException ie) {
                 break;
             }
@@ -222,6 +229,19 @@ public class CallSignaling {
         }
     }
 
+    public void reconnect() {
+        threadPool.execute(() -> {
+            synchronized (MQTT_LOCK) {
+                if (mqttClient != null) {
+                    try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
+                    try { mqttClient.close(); } catch (Throwable ignored) {}
+                    mqttClient = null;
+                }
+            }
+            connectMqttSynchronized();
+        });
+    }
+
     private void connectMqttSynchronized() {
         synchronized (MQTT_LOCK) {
             if (mqttClient != null && mqttClient.isConnected()) {
@@ -234,62 +254,21 @@ public class CallSignaling {
                     mqttClient = null;
                 }
 
-                // Unique ClientID with random salt to avoid any broker kicking
-                String clientId = "WiFiPhone_SK_v6_" + myExtId + "_" + (System.currentTimeMillis() % 10000);
+                String clientId = "WiFiPhone_SK_v6_" + myExtId + "_" + (System.currentTimeMillis() % 100000);
                 boolean connected = false;
+                boolean onWifi = isWifiConnected();
 
-                // 1. Try TCP Broker first (Fastest on Wi-Fi)
-                try {
-                    mqttClient = new MqttClient(TCP_BROKERS[0], clientId, new MemoryPersistence());
-                    MqttConnectOptions options = new MqttConnectOptions();
-                    options.setServerURIs(TCP_BROKERS);
-                    options.setAutomaticReconnect(true);
-                    options.setCleanSession(true);
-                    options.setConnectionTimeout(4);
-                    options.setKeepAliveInterval(30);
-
-                    JSONObject offlineObj = new JSONObject();
-                    offlineObj.put("ext", myExtId);
-                    offlineObj.put("status", "offline");
-                    options.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
-
-                    attachMqttCallback(mqttClient);
-                    Log.i(TAG, "Connecting to MQTT TCP brokers: " + TCP_BROKERS[0]);
-                    mqttClient.connect(options);
-                    connected = mqttClient.isConnected();
-                    Log.i(TAG, "Connected to MQTT TCP broker successfully!");
-                } catch (Throwable tcpEx) {
-                    Log.w(TAG, "MQTT TCP connect failed: " + tcpEx.getMessage() + ", trying SSL fallback...");
-                }
-
-                // 2. Fallback to SSL/TLS if TCP failed (Crucial for Cellular 4G/5G data networks)
-                if (!connected) {
-                    try {
-                        if (mqttClient != null) {
-                            try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
-                            try { mqttClient.close(); } catch (Throwable ignored) {}
-                        }
-                        mqttClient = new MqttClient(SSL_BROKERS[0], clientId, new MemoryPersistence());
-                        MqttConnectOptions sslOptions = new MqttConnectOptions();
-                        sslOptions.setServerURIs(SSL_BROKERS);
-                        sslOptions.setSocketFactory(getPermissiveSSLSocketFactory());
-                        sslOptions.setAutomaticReconnect(true);
-                        sslOptions.setCleanSession(true);
-                        sslOptions.setConnectionTimeout(5);
-                        sslOptions.setKeepAliveInterval(30);
-
-                        JSONObject offlineObj = new JSONObject();
-                        offlineObj.put("ext", myExtId);
-                        offlineObj.put("status", "offline");
-                        sslOptions.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
-
-                        attachMqttCallback(mqttClient);
-                        Log.i(TAG, "Connecting to MQTT SSL brokers: " + SSL_BROKERS[0]);
-                        mqttClient.connect(sslOptions);
-                        connected = mqttClient.isConnected();
-                        Log.i(TAG, "Connected to MQTT SSL broker successfully!");
-                    } catch (Throwable sslEx) {
-                        Log.w(TAG, "MQTT SSL connect failed: " + sslEx.getMessage());
+                // On Cellular 4G/5G, port 1883 is often blocked by carriers -> Try SSL FIRST!
+                // On Wi-Fi, try TCP first for speed, with fast fallback to SSL.
+                if (onWifi) {
+                    connected = tryConnectTcp(clientId);
+                    if (!connected) {
+                        connected = tryConnectSsl(clientId);
+                    }
+                } else {
+                    connected = tryConnectSsl(clientId);
+                    if (!connected) {
+                        connected = tryConnectTcp(clientId);
                     }
                 }
 
@@ -300,6 +279,73 @@ public class CallSignaling {
             } catch (Throwable t) {
                 Log.w(TAG, "MQTT connect attempt failed: " + t.getMessage());
             }
+        }
+    }
+
+    private boolean tryConnectSsl(String clientId) {
+        try {
+            if (mqttClient != null) {
+                try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
+                try { mqttClient.close(); } catch (Throwable ignored) {}
+            }
+            mqttClient = new MqttClient(SSL_BROKERS[0], clientId, new MemoryPersistence());
+            MqttConnectOptions sslOptions = new MqttConnectOptions();
+            sslOptions.setServerURIs(SSL_BROKERS);
+            sslOptions.setSocketFactory(getPermissiveSSLSocketFactory());
+            sslOptions.setHttpsHostnameVerificationEnabled(false);
+            sslOptions.setSSLHostnameVerifier((hostname, session) -> true);
+            sslOptions.setAutomaticReconnect(true);
+            sslOptions.setCleanSession(true);
+            sslOptions.setConnectionTimeout(4);
+            sslOptions.setKeepAliveInterval(25);
+
+            JSONObject offlineObj = new JSONObject();
+            offlineObj.put("ext", myExtId);
+            offlineObj.put("status", "offline");
+            offlineObj.put("time", System.currentTimeMillis());
+            // retained = false: Temporary disconnects must NOT permanently mark device offline!
+            sslOptions.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, false);
+
+            attachMqttCallback(mqttClient);
+            Log.i(TAG, "Connecting to MQTT SSL brokers...");
+            mqttClient.connect(sslOptions);
+            Log.i(TAG, "Connected to MQTT SSL broker successfully!");
+            return mqttClient.isConnected();
+        } catch (Throwable sslEx) {
+            Log.w(TAG, "MQTT SSL connect failed: " + sslEx.getMessage());
+            return false;
+        }
+    }
+
+    private boolean tryConnectTcp(String clientId) {
+        try {
+            if (mqttClient != null) {
+                try { mqttClient.disconnectForcibly(); } catch (Throwable ignored) {}
+                try { mqttClient.close(); } catch (Throwable ignored) {}
+            }
+            mqttClient = new MqttClient(TCP_BROKERS[0], clientId, new MemoryPersistence());
+            MqttConnectOptions options = new MqttConnectOptions();
+            options.setServerURIs(TCP_BROKERS);
+            options.setAutomaticReconnect(true);
+            options.setCleanSession(true);
+            options.setConnectionTimeout(3);
+            options.setKeepAliveInterval(25);
+
+            JSONObject offlineObj = new JSONObject();
+            offlineObj.put("ext", myExtId);
+            offlineObj.put("status", "offline");
+            offlineObj.put("time", System.currentTimeMillis());
+            // retained = false
+            options.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, false);
+
+            attachMqttCallback(mqttClient);
+            Log.i(TAG, "Connecting to MQTT TCP brokers...");
+            mqttClient.connect(options);
+            Log.i(TAG, "Connected to MQTT TCP broker successfully!");
+            return mqttClient.isConnected();
+        } catch (Throwable tcpEx) {
+            Log.w(TAG, "MQTT TCP connect failed: " + tcpEx.getMessage());
+            return false;
         }
     }
 
@@ -372,7 +418,11 @@ public class CallSignaling {
                 if (ext.equals(myExtId)) return;
 
                 if ("offline".equalsIgnoreCase(json.optString("status"))) {
-                    peerStatuses.remove(ext);
+                    long offlineTime = json.optLong("time", 0);
+                    PeerStatus cur = peerStatuses.get(ext);
+                    if (cur == null || offlineTime >= cur.lastSeen) {
+                        peerStatuses.remove(ext);
+                    }
                     return;
                 }
 
@@ -442,7 +492,7 @@ public class CallSignaling {
             try {
                 publishPresence();
                 broadcastPresence();
-                Thread.sleep(8000); // 8s heartbeat for active real-time discovery
+                Thread.sleep(6000); // 6s heartbeat for active real-time discovery
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {}
@@ -699,14 +749,26 @@ public class CallSignaling {
         });
     }
 
-    private String getLocalIpAddress() {
+    public static String getRealIpAddress() {
         try {
-            if (context != null) {
-                WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                if (wm != null) {
-                    int ip = wm.getConnectionInfo().getIpAddress();
-                    if (ip != 0) {
-                        return String.format("%d.%d.%d.%d", (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
+            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
+            for (NetworkInterface intf : interfaces) {
+                if (intf.isLoopback() || !intf.isUp()) continue;
+                if (intf.getName().toLowerCase().contains("wlan") || intf.getName().toLowerCase().contains("eth")) {
+                    List<InetAddress> addrs = Collections.list(intf.getInetAddresses());
+                    for (InetAddress addr : addrs) {
+                        if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
+                            return addr.getHostAddress();
+                        }
+                    }
+                }
+            }
+            for (NetworkInterface intf : interfaces) {
+                if (intf.isLoopback() || !intf.isUp()) continue;
+                List<InetAddress> addrs = Collections.list(intf.getInetAddresses());
+                for (InetAddress addr : addrs) {
+                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
+                        return addr.getHostAddress();
                     }
                 }
             }
@@ -714,13 +776,35 @@ public class CallSignaling {
         return "127.0.0.1";
     }
 
-    private boolean isWifiConnected() {
+    public static boolean isSameSubnet(String ip1, String ip2) {
+        if (ip1 == null || ip2 == null || ip1.isEmpty() || ip2.isEmpty()) return false;
+        if (ip1.equals("127.0.0.1") || ip2.equals("127.0.0.1") || ip1.equals("remote") || ip2.equals("remote")) return false;
+        int lastDot1 = ip1.lastIndexOf('.');
+        int lastDot2 = ip2.lastIndexOf('.');
+        if (lastDot1 == -1 || lastDot2 == -1) return false;
+        return ip1.substring(0, lastDot1).equals(ip2.substring(0, lastDot2));
+    }
+
+    public static boolean isWifiConnected(Context context) {
         try {
             if (context != null) {
-                WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                return wm != null && wm.isWifiEnabled() && wm.getConnectionInfo().getIpAddress() != 0;
+                ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    NetworkInfo net = cm.getActiveNetworkInfo();
+                    if (net != null && net.isConnected() && net.getType() == ConnectivityManager.TYPE_WIFI) {
+                        return true;
+                    }
+                }
             }
         } catch (Exception ignored) {}
         return false;
+    }
+
+    public static String getLocalIpAddress() {
+        return getRealIpAddress();
+    }
+
+    public boolean isWifiConnected() {
+        return isWifiConnected(context);
     }
 }

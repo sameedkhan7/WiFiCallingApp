@@ -175,24 +175,12 @@ public class MainActivity extends Activity {
     }
 
     private String getNetworkStatusString() {
-        String ip = getMyWifiIp();
-        if (ip.equals("127.0.0.1") || ip.isEmpty()) {
-            return "🟢 4G/5G Active • Online";
+        boolean isWifi = CallSignaling.isWifiConnected(this);
+        String ip = CallSignaling.getRealIpAddress();
+        if (isWifi) {
+            return "🟢 Wi-Fi: " + ip;
         }
-        return "🟢 Wi-Fi: " + ip;
-    }
-
-    private String getMyWifiIp() {
-        try {
-            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            if (wm != null && wm.isWifiEnabled()) {
-                int ip = wm.getConnectionInfo().getIpAddress();
-                if (ip != 0) {
-                    return String.format("%d.%d.%d.%d", (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
-                }
-            }
-        } catch (Exception ignored) {}
-        return "127.0.0.1";
+        return "🟢 4G/5G Active • Online";
     }
 
     private void loadContacts() {
@@ -384,15 +372,19 @@ public class MainActivity extends Activity {
         if (contact.directIp != null && !contact.directIp.trim().isEmpty()) {
             return contact.directIp.trim();
         }
+        String myLocalIp = CallSignaling.getRealIpAddress();
         CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
         if (ps != null && ps.localIp != null && !ps.localIp.isEmpty() && !ps.localIp.equals("127.0.0.1")) {
-            return ps.localIp;
+            // Only return LAN IP if both devices are on the SAME local subnet!
+            if (CallSignaling.isSameSubnet(myLocalIp, ps.localIp)) {
+                return ps.localIp;
+            }
         }
         for (String dev : CallSignaling.onlineDevices.keySet()) {
             if (dev.toLowerCase().contains(contact.query.toLowerCase()) ||
                 dev.toLowerCase().contains(contact.name.toLowerCase())) {
                 String ip = CallSignaling.onlineDevices.get(dev);
-                if (ip != null && !ip.equals("127.0.0.1")) {
+                if (ip != null && !ip.equals("127.0.0.1") && CallSignaling.isSameSubnet(myLocalIp, ip)) {
                     return ip;
                 }
             }

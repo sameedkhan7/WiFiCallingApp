@@ -5,13 +5,16 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
+import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -41,6 +44,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private MediaPlayer incomingRingtonePlayer;
+    private BroadcastReceiver networkReceiver;
 
     public static synchronized void stopRingtone(Context context) {
         if (instance != null) {
@@ -58,10 +62,28 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
             signaling = new CallSignaling(this, this);
             signaling.start();
+            registerNetworkReceiver();
             Log.i(TAG, "CallBackgroundService active 24/7 (Battery-Optimized).");
         } catch (Throwable t) {
             Log.e(TAG, "onCreate error", t);
         }
+    }
+
+    private void registerNetworkReceiver() {
+        try {
+            networkReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (signaling != null) {
+                        Log.i(TAG, "Network state changed -> triggering reconnect & presence publish");
+                        signaling.reconnect();
+                        signaling.publishPresence();
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+            registerReceiver(networkReceiver, filter);
+        } catch (Throwable ignored) {}
     }
 
     private void acquireLocks() {
@@ -271,6 +293,10 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         super.onDestroy();
         stopIncomingRingtone();
         try {
+            if (networkReceiver != null) {
+                try { unregisterReceiver(networkReceiver); } catch (Throwable ignored) {}
+                networkReceiver = null;
+            }
             if (signaling != null) signaling.removeListener(this);
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
             if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();

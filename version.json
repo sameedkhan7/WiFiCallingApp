@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 12,
-  "versionName": "1.1.2",
+  "versionCode": 13,
+  "versionName": "1.1.3",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Instant device identification & Device ID switcher in Settings\n2. Fix: Dual-Mode TCP & SSL failover with Mosquitto backup (100% reliable HiveMQ + Mosquitto)\n3. Fix: MainActivity starts signaling directly on launch (immune to background restrictions)\n4. Fix: Retained presence with randomized client ID to avoid broker disconnection"
+  "changelog": "1. Fix: Seamless Cellular 4G/5G to Home Wi-Fi cross-network calling\n2. Fix: SSL/TLS Priority on Mobile Data (bypasses carrier port 1883 blocking)\n3. Fix: Dual-Path audio hole punching (direct WAN + STUN symmetric reflection)\n4. Fix: Instant network handoff listener & automatic reconnect when switching networks"
 }
