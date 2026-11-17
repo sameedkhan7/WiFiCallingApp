@@ -1,6 +1,7 @@
 package com.secure.wificalling.audio;
 
 import android.content.Context;
+import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
@@ -8,26 +9,33 @@ import android.media.AudioTrack;
 import android.media.MediaRecorder;
 import android.media.audiofx.AcousticEchoCanceler;
 import android.media.audiofx.NoiseSuppressor;
+import android.os.Build;
+import android.os.Process;
+import android.util.Log;
 import com.secure.wificalling.network.CallSignaling;
 import com.secure.wificalling.security.CryptoUtil;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.List;
 
 /**
- * Full-Duplex Low-Latency Encrypted Audio Streaming Engine.
- * Supports hardware Acoustic Echo Cancellation (AEC) and Noise Suppression.
- * Compatible from Android 5.0 (API 21) up to Android 14+ (API 34).
+ * High-Definition Low-Latency Full-Duplex Voice Engine.
+ * Fixed 20ms Frame Processing (640 bytes @ 16kHz mono 16-bit PCM).
+ * Large jitter socket buffers (128 KB) to maintain audio quality over distance.
  */
 public class VoiceEngine {
 
-    private static final int SAMPLE_RATE = 16000; // 16kHz HD Voice
+    private static final String TAG = "VoiceEngine";
+    private static final int SAMPLE_RATE = 16000;
     private static final int CHANNEL_CONFIG_IN = AudioFormat.CHANNEL_IN_MONO;
     private static final int CHANNEL_CONFIG_OUT = AudioFormat.CHANNEL_OUT_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
+    private static final int FRAME_SIZE = 640; // Exact 20 ms frame
 
     private Context context;
-    private boolean isCalling = false;
+    private volatile boolean isCalling = false;
     private String remoteIp;
     private boolean isMuted = false;
     private boolean isSpeakerphone = false;
@@ -49,49 +57,71 @@ public class VoiceEngine {
         this.isCalling = true;
 
         AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        if (audioManager != null) {
+            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        }
 
-        new Thread(this::recordAndSend).start();
-        new Thread(this::receiveAndPlay).start();
+        new Thread(this::recordAndSend, "AudioRecordThread").start();
+        new Thread(this::receiveAndPlay, "AudioTrackThread").start();
     }
 
     private void recordAndSend() {
-        int bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT);
-        audioRecord = new AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT, bufferSize);
+        Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
 
-        // Hardware Echo Cancellation & Noise Suppression
-        if (AcousticEchoCanceler.isAvailable()) {
-            echoCanceler = AcousticEchoCanceler.create(audioRecord.getAudioSessionId());
-            if (echoCanceler != null) echoCanceler.setEnabled(true);
-        }
-        if (NoiseSuppressor.isAvailable()) {
-            noiseSuppressor = NoiseSuppressor.create(audioRecord.getAudioSessionId());
-            if (noiseSuppressor != null) noiseSuppressor.setEnabled(true);
-        }
+        int minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT);
+        int recordBufferSize = Math.max(minBufferSize, FRAME_SIZE * 4);
 
         try {
+            audioRecord = new AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                    SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT, recordBufferSize);
+
+            if (AcousticEchoCanceler.isAvailable()) {
+                try {
+                    echoCanceler = AcousticEchoCanceler.create(audioRecord.getAudioSessionId());
+                    if (echoCanceler != null) echoCanceler.setEnabled(true);
+                } catch (Throwable ignored) {}
+            }
+            if (NoiseSuppressor.isAvailable()) {
+                try {
+                    noiseSuppressor = NoiseSuppressor.create(audioRecord.getAudioSessionId());
+                    if (noiseSuppressor != null) noiseSuppressor.setEnabled(true);
+                } catch (Throwable ignored) {}
+            }
+
             audioRecord.startRecording();
-            InetAddress targetAddr = InetAddress.getByName(remoteIp);
+
             DatagramSocket sendSocket = new DatagramSocket();
+            sendSocket.setSendBufferSize(128 * 1024);
 
-            byte[] buffer = new byte[bufferSize];
+            InetAddress targetAddr = (remoteIp != null && !remoteIp.equals("remote") && !remoteIp.isEmpty())
+                    ? InetAddress.getByName(remoteIp) : null;
+
+            byte[] frame = new byte[FRAME_SIZE];
+
             while (isCalling) {
-                int read = audioRecord.read(buffer, 0, buffer.length);
-                if (read > 0) {
-                    if (isMuted) {
-                        java.util.Arrays.fill(buffer, 0, read, (byte) 0);
-                    }
-                    // Real-time AES Audio Encryption
-                    CryptoUtil.encryptAudioBuffer(buffer, 0, read);
+                int read = 0;
+                while (read < FRAME_SIZE && isCalling) {
+                    int r = audioRecord.read(frame, read, FRAME_SIZE - read);
+                    if (r > 0) read += r;
+                    else break;
+                }
 
-                    DatagramPacket packet = new DatagramPacket(buffer, read, targetAddr, CallSignaling.AUDIO_PORT);
-                    sendSocket.send(packet);
+                if (read == FRAME_SIZE && isCalling) {
+                    if (isMuted) {
+                        java.util.Arrays.fill(frame, (byte) 0);
+                    }
+
+                    CryptoUtil.encryptAudioBuffer(frame, 0, FRAME_SIZE);
+
+                    if (targetAddr != null) {
+                        DatagramPacket packet = new DatagramPacket(frame, FRAME_SIZE, targetAddr, CallSignaling.AUDIO_PORT);
+                        sendSocket.send(packet);
+                    }
                 }
             }
             sendSocket.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "RecordAndSend error", e);
         } finally {
             if (audioRecord != null) {
                 try {
@@ -103,27 +133,41 @@ public class VoiceEngine {
     }
 
     private void receiveAndPlay() {
-        int bufferSize = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
-        audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL,
-                SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, bufferSize, AudioTrack.MODE_STREAM);
+        Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
 
-        audioTrack.play();
+        int minBufferSize = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
+        int trackBufferSize = Math.max(minBufferSize, FRAME_SIZE * 4);
 
         try {
-            udpSocket = new DatagramSocket(CallSignaling.AUDIO_PORT);
-            byte[] buffer = new byte[bufferSize];
+            audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL,
+                    SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, trackBufferSize, AudioTrack.MODE_STREAM);
+
+            audioTrack.play();
+
+            udpSocket = new DatagramSocket(null);
+            udpSocket.setReuseAddress(true);
+            udpSocket.setReceiveBufferSize(128 * 1024);
+            udpSocket.bind(new InetSocketAddress(CallSignaling.AUDIO_PORT));
+
+            byte[] buffer = new byte[FRAME_SIZE * 2];
 
             while (isCalling) {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 udpSocket.receive(packet);
 
-                // Decrypt audio packet
-                CryptoUtil.decryptAudioBuffer(packet.getData(), 0, packet.getLength());
+                int len = packet.getLength();
+                if (len > 0) {
+                    // Update remote IP from incoming audio packets if needed
+                    if (remoteIp == null || remoteIp.equals("remote")) {
+                        remoteIp = packet.getAddress().getHostAddress();
+                    }
 
-                audioTrack.write(packet.getData(), 0, packet.getLength());
+                    CryptoUtil.decryptAudioBuffer(packet.getData(), 0, len);
+                    audioTrack.write(packet.getData(), 0, len);
+                }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "ReceiveAndPlay error", e);
         } finally {
             if (audioTrack != null) {
                 try {
@@ -144,7 +188,27 @@ public class VoiceEngine {
     public void setSpeakerphone(boolean speakerphone) {
         this.isSpeakerphone = speakerphone;
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        am.setSpeakerphoneOn(speakerphone);
+        if (am == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                if (speakerphone) {
+                    List<AudioDeviceInfo> devices = am.getAvailableCommunicationDevices();
+                    for (AudioDeviceInfo dev : devices) {
+                        if (dev.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                            am.setCommunicationDevice(dev);
+                            break;
+                        }
+                    }
+                } else {
+                    am.clearCommunicationDevice();
+                }
+            } catch (Throwable t) {
+                am.setSpeakerphoneOn(speakerphone);
+            }
+        } else {
+            am.setSpeakerphoneOn(speakerphone);
+        }
     }
 
     public void stopCall() {
@@ -153,6 +217,14 @@ public class VoiceEngine {
         if (noiseSuppressor != null) noiseSuppressor.release();
 
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        am.setMode(AudioManager.MODE_NORMAL);
+        if (am != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    am.clearCommunicationDevice();
+                } catch (Throwable ignored) {}
+            }
+            am.setSpeakerphoneOn(false);
+            am.setMode(AudioManager.MODE_NORMAL);
+        }
     }
 }

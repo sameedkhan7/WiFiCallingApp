@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.net.DhcpInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -38,25 +37,25 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
- * Google Dialer Style Main Speed-Dial & Contact Screen.
- * Full Contact CRUD, Profile Inspection, Subnet Device Discovery,
- * and 1-Click Update Support.
+ * Google Dialer Speed-Dial & Contact Management Screen.
+ * Prevents self-calling, displays live Wi-Fi vs 4G/5G status,
+ * and manages speed-dial contacts.
  */
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
     private static final int PERMISSION_REQ_CODE = 2001;
     private static final String PREFS_NAME = "WiFiCallingPrefs";
-    private static final String KEY_CONTACTS_JSON = "CONTACTS_JSON_V2";
+    private static final String KEY_CONTACTS_JSON = "CONTACTS_JSON_V3";
 
     public static class ContactItem {
-        public String id;
-        public String name;
-        public String query; // Device match keyword or direct IP
-        public String directIp;
+        public String ext;      // Extension ID (e.g. "101", "102", "103", "104")
+        public String name;     // Display name
+        public String query;    // Device model filter
+        public String directIp; // Optional static IP
 
-        public ContactItem(String id, String name, String query, String directIp) {
-            this.id = id;
+        public ContactItem(String ext, String name, String query, String directIp) {
+            this.ext = ext;
             this.name = name;
             this.query = query;
             this.directIp = directIp;
@@ -69,6 +68,7 @@ public class MainActivity extends Activity {
     private LinearLayout containerDiscovered;
     private TextView tvMyDeviceName, tvMyDeviceIp;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
+    private String myExtId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,13 +82,15 @@ public class MainActivity extends Activity {
             setContentView(R.layout.activity_main);
             prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
+            myExtId = CallSignaling.detectMyExtensionId();
+
             tvMyDeviceName = findViewById(R.id.tvMyDeviceName);
             tvMyDeviceIp = findViewById(R.id.tvMyDeviceIp);
             containerContacts = findViewById(R.id.containerContacts);
             containerDiscovered = findViewById(R.id.containerDiscovered);
 
-            tvMyDeviceName.setText("This Phone: " + Build.MODEL);
-            tvMyDeviceIp.setText("IP: " + getMyWifiIp());
+            tvMyDeviceName.setText("This Phone: " + Build.MODEL + " (Ext: " + myExtId + ")");
+            tvMyDeviceIp.setText("Network: " + getNetworkStatusString());
 
             Button btnAdd = findViewById(R.id.btnTopAddContact);
             Button btnSettings = findViewById(R.id.btnTopSettings);
@@ -109,14 +111,22 @@ public class MainActivity extends Activity {
             startPeriodicStatusRefresh();
             UpdateManager.checkUpdate(this, false);
         } catch (Throwable t) {
-            Log.e(TAG, "Error in onCreate", t);
+            Log.e(TAG, "onCreate error", t);
         }
+    }
+
+    private String getNetworkStatusString() {
+        String ip = getMyWifiIp();
+        if (ip.equals("127.0.0.1") || ip.isEmpty()) {
+            return "Mobile Data (4G/5G Active)";
+        }
+        return "Wi-Fi IP: " + ip;
     }
 
     private String getMyWifiIp() {
         try {
             WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            if (wm != null) {
+            if (wm != null && wm.isWifiEnabled()) {
                 int ip = wm.getConnectionInfo().getIpAddress();
                 if (ip != 0) {
                     return String.format("%d.%d.%d.%d", (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
@@ -135,18 +145,16 @@ public class MainActivity extends Activity {
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject obj = arr.getJSONObject(i);
                     contactList.add(new ContactItem(
-                            obj.optString("id", String.valueOf(System.currentTimeMillis())),
+                            obj.optString("ext", "101"),
                             obj.optString("name", "Device"),
                             obj.optString("query", ""),
                             obj.optString("directIp", "")
                     ));
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "JSON parse error", e);
-            }
+            } catch (Exception ignored) {}
         }
 
-        // Initialize default 4 phones if empty
+        // Initialize 4 distinct phones if not saved
         if (contactList.isEmpty()) {
             contactList.add(new ContactItem("101", "Home Vivo Y51L", "Vivo", ""));
             contactList.add(new ContactItem("102", "My OnePlus (Main)", "OnePlus", ""));
@@ -161,22 +169,22 @@ public class MainActivity extends Activity {
             JSONArray arr = new JSONArray();
             for (ContactItem c : contactList) {
                 JSONObject obj = new JSONObject();
-                obj.put("id", c.id);
+                obj.put("ext", c.ext);
                 obj.put("name", c.name);
                 obj.put("query", c.query);
                 obj.put("directIp", c.directIp);
                 arr.put(obj);
             }
             prefs.edit().putString(KEY_CONTACTS_JSON, arr.toString()).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "Save contacts error", e);
-        }
+        } catch (Exception ignored) {}
     }
 
     private void renderContactsUI() {
         containerContacts.removeAllViews();
 
         for (ContactItem contact : contactList) {
+            boolean isSelf = contact.ext.equals(myExtId);
+
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.HORIZONTAL);
             card.setBackgroundResource(R.drawable.bg_card);
@@ -187,7 +195,7 @@ public class MainActivity extends Activity {
             lp.setMargins(0, 0, 0, dpToPx(10));
             card.setLayoutParams(lp);
 
-            // Circular Initial Avatar (Google Dialer style)
+            // Circular Initial Avatar
             TextView avatar = new TextView(this);
             avatar.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(44), dpToPx(44)));
             avatar.setBackgroundResource(R.drawable.bg_circle_avatar);
@@ -198,7 +206,7 @@ public class MainActivity extends Activity {
             avatar.setTypeface(null, Typeface.BOLD);
             card.addView(avatar);
 
-            // Name & Status Details
+            // Contact Name & Status
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
             LinearLayout.LayoutParams detLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -206,47 +214,77 @@ public class MainActivity extends Activity {
             details.setLayoutParams(detLp);
 
             TextView tvName = new TextView(this);
-            tvName.setText(contact.name);
+            tvName.setText(contact.name + (isSelf ? " (This Device)" : ""));
             tvName.setTextSize(17);
             tvName.setTypeface(null, Typeface.BOLD);
             tvName.setTextColor(Color.WHITE);
             details.addView(tvName);
 
             TextView tvStatus = new TextView(this);
-            String resolvedIp = resolveIpForContact(contact);
-            boolean isOnline = (resolvedIp != null);
-            tvStatus.setText(isOnline ? "🟢 Online (" + resolvedIp + ")" : "⚪ Offline");
+            if (isSelf) {
+                tvStatus.setText("🟢 Active Current Phone");
+                tvStatus.setTextColor(Color.parseColor("#34A853"));
+            } else {
+                CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
+                boolean isOnline = (ps != null && System.currentTimeMillis() - ps.lastSeen < 15000);
+                if (isOnline) {
+                    tvStatus.setText("🟢 Online (" + ps.networkType + (ps.localIp.isEmpty() ? "" : ": " + ps.localIp) + ")");
+                    tvStatus.setTextColor(Color.parseColor("#34A853"));
+                } else {
+                    String lanIp = resolveLanIp(contact);
+                    if (lanIp != null) {
+                        tvStatus.setText("🟢 Online (Local Wi-Fi)");
+                        tvStatus.setTextColor(Color.parseColor("#34A853"));
+                    } else {
+                        tvStatus.setText("⚪ Offline");
+                        tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
+                    }
+                }
+            }
             tvStatus.setTextSize(12);
-            tvStatus.setTextColor(isOnline ? Color.parseColor("#34A853") : Color.parseColor("#9E9E9E"));
             details.addView(tvStatus);
-
             card.addView(details);
 
-            // Call Button
-            Button btnCall = new Button(this);
-            btnCall.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(80), dpToPx(42)));
-            btnCall.setText("CALL");
-            btnCall.setTextSize(13);
-            btnCall.setTypeface(null, Typeface.BOLD);
-            btnCall.setTextColor(Color.WHITE);
-            btnCall.setBackgroundResource(R.drawable.bg_button_call);
-            btnCall.setOnClickListener(v -> initiateCall(contact));
-            card.addView(btnCall);
+            // Call Action or Self Badge
+            if (isSelf) {
+                TextView selfBadge = new TextView(this);
+                selfBadge.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(85), dpToPx(38)));
+                selfBadge.setText("YOU");
+                selfBadge.setGravity(Gravity.CENTER);
+                selfBadge.setTextSize(12);
+                selfBadge.setTypeface(null, Typeface.BOLD);
+                selfBadge.setTextColor(Color.parseColor("#888888"));
+                selfBadge.setBackgroundResource(R.drawable.bg_card);
+                card.addView(selfBadge);
+            } else {
+                Button btnCall = new Button(this);
+                btnCall.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(80), dpToPx(42)));
+                btnCall.setText("CALL");
+                btnCall.setTextSize(13);
+                btnCall.setTypeface(null, Typeface.BOLD);
+                btnCall.setTextColor(Color.WHITE);
+                btnCall.setBackgroundResource(R.drawable.bg_button_call);
+                btnCall.setOnClickListener(v -> initiateCall(contact));
+                card.addView(btnCall);
+            }
 
-            // Clicking card opens Google Dialer Profile/Edit Sheet
-            card.setOnClickListener(v -> showContactProfileDialog(contact));
-            card.setOnLongClickListener(v -> {
-                showContactProfileDialog(contact);
-                return true;
+            // Click card opens profile / edit dialog
+            card.setOnClickListener(v -> {
+                if (!isSelf) showContactProfileDialog(contact);
+                else Toast.makeText(this, "This is your current phone.", Toast.LENGTH_SHORT).show();
             });
 
             containerContacts.addView(card);
         }
     }
 
-    private String resolveIpForContact(ContactItem contact) {
+    private String resolveLanIp(ContactItem contact) {
         if (contact.directIp != null && !contact.directIp.trim().isEmpty()) {
             return contact.directIp.trim();
+        }
+        CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
+        if (ps != null && ps.localIp != null && !ps.localIp.isEmpty()) {
+            return ps.localIp;
         }
         for (String dev : CallSignaling.onlineDevices.keySet()) {
             if (dev.toLowerCase().contains(contact.query.toLowerCase()) ||
@@ -257,16 +295,39 @@ public class MainActivity extends Activity {
         return null;
     }
 
+    private void initiateCall(ContactItem contact) {
+        if (contact.ext.equals(myExtId)) {
+            Toast.makeText(this, "Cannot call own device!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String lanIp = resolveLanIp(contact);
+        Toast.makeText(this, "Calling " + contact.name + "...", Toast.LENGTH_SHORT).show();
+
+        CallSignaling signaling = new CallSignaling(this, null);
+        signaling.sendCommand(contact.ext, lanIp, "INVITE");
+
+        Intent intent = new Intent(this, InCallActivity.class);
+        intent.putExtra("REMOTE_NAME", contact.name);
+        intent.putExtra("REMOTE_IP", lanIp != null ? lanIp : "remote");
+        intent.putExtra("REMOTE_EXT", contact.ext);
+        intent.putExtra("IS_OUTGOING", true);
+        startActivity(intent);
+    }
+
     private void showContactProfileDialog(ContactItem contact) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(contact.name);
+        builder.setTitle(contact.name + " (Ext: " + contact.ext + ")");
 
-        String currentIp = resolveIpForContact(contact);
-        String info = "Device: " + contact.query + "\nStatus: " + (currentIp != null ? "Online (" + currentIp + ")" : "Offline");
-        builder.setMessage(info);
+        CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
+        String status = (ps != null && System.currentTimeMillis() - ps.lastSeen < 15000)
+                ? "Online (" + ps.networkType + ")" : "Offline / Standby";
+
+        String lanIp = resolveLanIp(contact);
+        builder.setMessage("Device: " + contact.query + "\nStatus: " + status + "\nLAN IP: " + (lanIp != null ? lanIp : "N/A"));
 
         builder.setPositiveButton("CALL", (dialog, which) -> initiateCall(contact));
-        builder.setNeutralButton("Edit Name/IP", (dialog, which) -> showEditContactDialog(contact));
+        builder.setNeutralButton("Edit", (dialog, which) -> showEditContactDialog(contact));
         builder.setNegativeButton("Delete", (dialog, which) -> {
             contactList.remove(contact);
             saveContacts();
@@ -278,32 +339,37 @@ public class MainActivity extends Activity {
 
     private void showAddContactDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Add New Contact / Device");
+        builder.setTitle("Add New Device");
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dpToPx(20), dpToPx(10), dpToPx(20), dpToPx(10));
 
         final EditText etName = new EditText(this);
-        etName.setHint("Contact Name (e.g. Mummy Vivo)");
+        etName.setHint("Contact Name (e.g. Samsung S24)");
         layout.addView(etName);
 
+        final EditText etExt = new EditText(this);
+        etExt.setHint("Extension ID (e.g. 101, 102, 103, 104)");
+        layout.addView(etExt);
+
         final EditText etQuery = new EditText(this);
-        etQuery.setHint("Device Name / Model (e.g. Vivo, OnePlus)");
+        etQuery.setHint("Device Model Keyword (e.g. S24, Vivo)");
         layout.addView(etQuery);
 
         final EditText etIp = new EditText(this);
-        etIp.setHint("Optional IP (e.g. 192.168.1.15)");
+        etIp.setHint("Direct IP (Optional)");
         layout.addView(etIp);
 
         builder.setView(layout);
 
-        builder.setPositiveButton("Add", (dialog, which) -> {
+        builder.setPositiveButton("Save", (dialog, which) -> {
             String name = etName.getText().toString().trim();
+            String ext = etExt.getText().toString().trim();
             String query = etQuery.getText().toString().trim();
             String ip = etIp.getText().toString().trim();
-            if (!name.isEmpty()) {
-                contactList.add(new ContactItem(String.valueOf(System.currentTimeMillis()), name, query.isEmpty() ? name : query, ip));
+            if (!name.isEmpty() && !ext.isEmpty()) {
+                contactList.add(new ContactItem(ext, name, query.isEmpty() ? name : query, ip));
                 saveContacts();
                 renderContactsUI();
                 Toast.makeText(this, "Contact added!", Toast.LENGTH_SHORT).show();
@@ -325,20 +391,24 @@ public class MainActivity extends Activity {
         etName.setText(contact.name);
         layout.addView(etName);
 
+        final EditText etExt = new EditText(this);
+        etExt.setText(contact.ext);
+        layout.addView(etExt);
+
         final EditText etQuery = new EditText(this);
         etQuery.setText(contact.query);
-        etQuery.setHint("Device query keyword");
         layout.addView(etQuery);
 
         final EditText etIp = new EditText(this);
         etIp.setText(contact.directIp);
-        etIp.setHint("Direct IP address (optional)");
+        etIp.setHint("Direct IP (optional)");
         layout.addView(etIp);
 
         builder.setView(layout);
 
         builder.setPositiveButton("Save", (dialog, which) -> {
             contact.name = etName.getText().toString().trim();
+            contact.ext = etExt.getText().toString().trim();
             contact.query = etQuery.getText().toString().trim();
             contact.directIp = etIp.getText().toString().trim();
             saveContacts();
@@ -351,47 +421,28 @@ public class MainActivity extends Activity {
 
     private void showSettingsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Profile & Settings");
+        builder.setTitle("Settings & Profile");
 
-        String msg = "Device: " + Build.MODEL + "\n" +
-                     "Android Version: " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")\n" +
-                     "Wi-Fi IP: " + getMyWifiIp() + "\n" +
-                     "App Version: v1.0.2 (Signed Release)\n" +
-                     "Encryption: AES-256-GCM Hardware-Backed\n" +
-                     "Signaling Port: 50620 (P2P)";
+        String msg = "Phone: " + Build.MODEL + "\n" +
+                     "Ext ID: " + myExtId + "\n" +
+                     "Status: " + getNetworkStatusString() + "\n" +
+                     "Version: v1.0.3 (Hybrid Wi-Fi + Internet)\n" +
+                     "Encryption: AES-256 P2P";
         builder.setMessage(msg);
 
-        builder.setPositiveButton("Scan Subnet", (dialog, which) -> {
-            Toast.makeText(this, "Scanning local Wi-Fi for devices...", Toast.LENGTH_SHORT).show();
+        // Short button labels so nothing gets truncated on small screens
+        builder.setPositiveButton("Scan Wi-Fi", (dialog, which) -> {
+            Toast.makeText(this, "Scanning subnet...", Toast.LENGTH_SHORT).show();
             startSubnetFastScan();
         });
 
-        builder.setNeutralButton("Check for Updates", (dialog, which) -> {
+        builder.setNeutralButton("Updates", (dialog, which) -> {
             Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
             UpdateManager.checkUpdate(this, true);
         });
 
         builder.setNegativeButton("Close", (dialog, which) -> dialog.dismiss());
         builder.show();
-    }
-
-    private void initiateCall(ContactItem contact) {
-        String targetIp = resolveIpForContact(contact);
-        if (targetIp == null) {
-            Toast.makeText(this, contact.name + " is not connected to this Wi-Fi!", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        Toast.makeText(this, "Calling " + contact.name + "...", Toast.LENGTH_SHORT).show();
-
-        CallSignaling signaling = new CallSignaling(this, null);
-        signaling.sendCommand(targetIp, "INVITE", Build.MODEL);
-
-        Intent intent = new Intent(this, InCallActivity.class);
-        intent.putExtra("REMOTE_NAME", contact.name);
-        intent.putExtra("REMOTE_IP", targetIp);
-        intent.putExtra("IS_OUTGOING", true);
-        startActivity(intent);
     }
 
     private void startSubnetFastScan() {
@@ -401,7 +452,6 @@ public class MainActivity extends Activity {
                 if (myIp == null || !myIp.contains(".")) return;
                 String prefix = myIp.substring(0, myIp.lastIndexOf(".") + 1);
 
-                // Multi-threaded fast ping to detect all phones on port 50620
                 for (int i = 1; i <= 254; i++) {
                     final String testIp = prefix + i;
                     if (testIp.equals(myIp)) continue;
@@ -411,7 +461,6 @@ public class MainActivity extends Activity {
                             Socket s = new Socket();
                             s.connect(new InetSocketAddress(testIp, CallSignaling.SIGNALING_PORT), 400);
                             s.close();
-                            // Found device on port 50620!
                             CallSignaling.onlineDevices.put("Phone (" + testIp + ")", testIp);
                             mainHandler.post(this::renderContactsUI);
                         } catch (Exception ignored) {}
@@ -427,6 +476,7 @@ public class MainActivity extends Activity {
             public void run() {
                 renderContactsUI();
                 renderDiscoveredDevicesUI();
+                tvMyDeviceIp.setText("Network: " + getNetworkStatusString());
                 mainHandler.postDelayed(this, 3000);
             }
         }, 3000);
@@ -437,7 +487,6 @@ public class MainActivity extends Activity {
         for (String devName : CallSignaling.onlineDevices.keySet()) {
             String ip = CallSignaling.onlineDevices.get(devName);
 
-            // If not already in contacts, show as discovered
             boolean alreadySaved = false;
             for (ContactItem c : contactList) {
                 if (c.query.equalsIgnoreCase(devName) || (c.directIp != null && c.directIp.equals(ip))) {
@@ -453,7 +502,7 @@ public class MainActivity extends Activity {
                 btnAddFound.setTextColor(Color.WHITE);
                 btnAddFound.setBackgroundResource(R.drawable.bg_card);
                 btnAddFound.setOnClickListener(v -> {
-                    contactList.add(new ContactItem(String.valueOf(System.currentTimeMillis()), devName, devName, ip));
+                    contactList.add(new ContactItem("105", devName, devName, ip));
                     saveContacts();
                     renderContactsUI();
                     renderDiscoveredDevicesUI();

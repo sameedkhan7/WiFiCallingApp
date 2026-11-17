@@ -13,16 +13,18 @@ import android.widget.Button;
 import android.widget.TextView;
 import com.secure.wificalling.R;
 import com.secure.wificalling.network.CallSignaling;
+import com.secure.wificalling.service.CallBackgroundService;
 
 /**
  * Google Dialer Style Incoming Call Screen.
- * Wakes up locked phone, dismisses keyguard, shows caller info,
- * and handles Answer/Decline actions.
+ * Wakes up phone from lockscreen, shows caller identity,
+ * and handles Answer/Decline with 100% reliable ringtone shutdown.
  */
 public class IncomingCallActivity extends Activity implements CallSignaling.CallListener {
 
     private String callerName;
     private String callerIp;
+    private String callerExt;
     private CallSignaling signaling;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -36,9 +38,10 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
 
         callerName = getIntent().getStringExtra("CALLER_NAME");
         callerIp = getIntent().getStringExtra("CALLER_IP");
+        callerExt = getIntent().getStringExtra("CALLER_EXT");
 
         TextView tvCaller = findViewById(R.id.tvCallerName);
-        tvCaller.setText(callerName != null ? callerName : "Trusted Wi-Fi Device");
+        tvCaller.setText(callerName != null ? callerName : "Incoming Wi-Fi Call");
 
         signaling = new CallSignaling(this, this);
 
@@ -68,13 +71,17 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
     }
 
     private void answerCall() {
-        if (signaling != null && callerIp != null) {
-            signaling.sendCommand(callerIp, "ACCEPT", Build.MODEL);
+        // Stop incoming ringtone immediately
+        CallBackgroundService.stopRingtone(this);
+
+        if (signaling != null) {
+            signaling.sendCommand(callerExt, callerIp, "ACCEPT");
         }
 
         Intent inCall = new Intent(this, InCallActivity.class);
         inCall.putExtra("REMOTE_NAME", callerName);
         inCall.putExtra("REMOTE_IP", callerIp);
+        inCall.putExtra("REMOTE_EXT", callerExt);
         inCall.putExtra("IS_OUTGOING", false);
         startActivity(inCall);
 
@@ -82,19 +89,23 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
     }
 
     private void rejectCall() {
-        if (signaling != null && callerIp != null) {
-            signaling.sendCommand(callerIp, "REJECT", Build.MODEL);
+        // Stop incoming ringtone immediately
+        CallBackgroundService.stopRingtone(this);
+
+        if (signaling != null) {
+            signaling.sendCommand(callerExt, callerIp, "REJECT");
         }
         finish();
     }
 
     @Override
     public void onCallEnded(String senderIp) {
+        CallBackgroundService.stopRingtone(this);
         mainHandler.post(this::finish);
     }
 
     @Override
-    public void onIncomingCall(String callerName, String callerIp) {}
+    public void onIncomingCall(String callerName, String callerIp, String callerExt) {}
 
     @Override
     public void onCallRinging(String remoteIp) {}
@@ -108,6 +119,7 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        CallBackgroundService.stopRingtone(this);
         if (signaling != null) {
             signaling.removeListener(this);
         }

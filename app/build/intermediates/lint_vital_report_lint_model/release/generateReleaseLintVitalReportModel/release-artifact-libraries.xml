@@ -169,6 +169,10 @@
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
   <library
+      name="org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5@jar"
+      jars="C:\Users\SK\.gradle\caches\modules-2\files-2.1\org.eclipse.paho\org.eclipse.paho.client.mqttv3\1.2.5\1546cfc794449c39ad569853843a930104fdc297\org.eclipse.paho.client.mqttv3-1.2.5.jar"
+      resolved="org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5"/>
+  <library
       name="org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.1@jar"
       jars="C:\Users\SK\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-coroutines-core-jvm\1.6.1\97fd74ccf54a863d221956ffcd21835e168e2aaa\kotlinx-coroutines-core-jvm-1.6.1.jar"
       resolved="org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.1"/>

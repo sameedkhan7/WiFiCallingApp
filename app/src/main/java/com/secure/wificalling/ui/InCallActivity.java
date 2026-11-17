@@ -3,7 +3,6 @@ package com.secure.wificalling.ui;
 import android.app.Activity;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,11 +15,12 @@ import android.widget.TextView;
 import com.secure.wificalling.R;
 import com.secure.wificalling.audio.VoiceEngine;
 import com.secure.wificalling.network.CallSignaling;
+import com.secure.wificalling.service.CallBackgroundService;
 
 /**
- * Google Dialer Style Outgoing & Active Call Screen.
+ * Active In-Call Screen.
  * Handshakes call states: CALLING -> RINGING -> CONNECTED -> ENDED.
- * Timer ONLY starts when remote peer accepts the call!
+ * Synchronized hangup across both devices.
  */
 public class InCallActivity extends Activity implements CallSignaling.CallListener {
 
@@ -30,11 +30,12 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
     private CallSignaling signaling;
     private String remoteIp;
     private String remoteName;
+    private String remoteExt;
     private boolean isOutgoing;
 
     private TextView tvStatus;
     private Chronometer chronometer;
-    private ToneGenerator ringbackTone;
+    private ToneGenerator toneGenerator;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private boolean isMuted = false;
@@ -46,8 +47,12 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_in_call);
 
+        // Ensure any incoming ringtone is stopped
+        CallBackgroundService.stopRingtone(this);
+
         remoteName = getIntent().getStringExtra("REMOTE_NAME");
         remoteIp = getIntent().getStringExtra("REMOTE_IP");
+        remoteExt = getIntent().getStringExtra("REMOTE_EXT");
         isOutgoing = getIntent().getBooleanExtra("IS_OUTGOING", true);
 
         TextView tvName = findViewById(R.id.tvInCallName);
@@ -63,12 +68,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         signaling = new CallSignaling(this, this);
 
         if (isOutgoing) {
-            // Outgoing call: Wait for peer to answer!
             tvStatus.setText("Calling...");
             chronometer.setVisibility(View.GONE);
             startRingbackTone();
         } else {
-            // Incoming answered call: Immediately active
             startActiveCall();
         }
 
@@ -89,8 +92,8 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
 
     private void startRingbackTone() {
         try {
-            ringbackTone = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80);
-            ringbackTone.startTone(ToneGenerator.TONE_SUP_RINGTONE);
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80);
+            toneGenerator.startTone(ToneGenerator.TONE_SUP_RINGTONE);
         } catch (Throwable t) {
             Log.e(TAG, "Ringback error", t);
         }
@@ -98,10 +101,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
 
     private void stopRingbackTone() {
         try {
-            if (ringbackTone != null) {
-                ringbackTone.stopTone();
-                ringbackTone.release();
-                ringbackTone = null;
+            if (toneGenerator != null) {
+                toneGenerator.stopTone();
+                toneGenerator.release();
+                toneGenerator = null;
             }
         } catch (Throwable ignored) {}
     }
@@ -131,14 +134,19 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
             voiceEngine = null;
         }
 
-        if (notifyRemote && signaling != null && remoteIp != null) {
-            signaling.sendCommand(remoteIp, "HANGUP", Build.MODEL);
+        if (notifyRemote && signaling != null) {
+            signaling.sendCommand(remoteExt, remoteIp, "HANGUP");
         }
+
+        try {
+            ToneGenerator beep = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, 90);
+            beep.startTone(ToneGenerator.TONE_PROP_BEEP2, 250);
+        } catch (Throwable ignored) {}
 
         mainHandler.post(() -> {
             tvStatus.setText("Call Ended");
             chronometer.stop();
-            mainHandler.postDelayed(this::finish, 1000);
+            mainHandler.postDelayed(this::finish, 800);
         });
     }
 
@@ -149,6 +157,9 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
 
     @Override
     public void onCallAccepted(String senderIp) {
+        if (senderIp != null && !senderIp.isEmpty() && !senderIp.equals("remote")) {
+            remoteIp = senderIp;
+        }
         startActiveCall();
     }
 
@@ -157,7 +168,7 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         stopRingbackTone();
         mainHandler.post(() -> {
             tvStatus.setText("Call Declined");
-            mainHandler.postDelayed(this::finish, 1500);
+            mainHandler.postDelayed(this::finish, 1200);
         });
     }
 
@@ -167,7 +178,7 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
     }
 
     @Override
-    public void onIncomingCall(String callerName, String callerIp) {}
+    public void onIncomingCall(String callerName, String callerIp, String callerExt) {}
 
     @Override
     protected void onDestroy() {

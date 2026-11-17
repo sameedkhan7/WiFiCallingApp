@@ -24,9 +24,9 @@ import com.secure.wificalling.ui.IncomingCallActivity;
 import com.secure.wificalling.ui.MainActivity;
 
 /**
- * 24/7 Persistent Call Listener Background Service.
- * Bypasses aggressive battery management and lockscreen restrictions
- * on Vivo (Android 5.0.2), OnePlus (Android 14), and Samsung (Android 14+).
+ * 24/7 Persistent Call Listener Service.
+ * Manages incoming call alerts, loud ringtones, and deep sleep wakeup.
+ * Guarantees ringtone stops immediately when call is answered or declined.
  */
 public class CallBackgroundService extends Service implements CallSignaling.CallListener {
 
@@ -36,23 +36,32 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     private static final int NOTIFICATION_ID = 1001;
     private static final int INCOMING_CALL_NOTIF_ID = 1002;
 
+    private static CallBackgroundService instance;
     private CallSignaling signaling;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private MediaPlayer incomingRingtonePlayer;
 
+    public static synchronized void stopRingtone(Context context) {
+        if (instance != null) {
+            instance.stopIncomingRingtone();
+            instance.dismissIncomingNotification();
+        }
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         try {
             acquireLocks();
             startForegroundServiceNotification();
 
             signaling = new CallSignaling(this, this);
             signaling.start();
-            Log.i(TAG, "CallBackgroundService running 24/7.");
+            Log.i(TAG, "CallBackgroundService active 24/7.");
         } catch (Throwable t) {
-            Log.e(TAG, "Error in onCreate", t);
+            Log.e(TAG, "onCreate error", t);
         }
     }
 
@@ -63,9 +72,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:ServiceWakeLock");
                 wakeLock.acquire();
             }
-        } catch (Throwable t) {
-            Log.e(TAG, "WakeLock error", t);
-        }
+        } catch (Throwable ignored) {}
 
         try {
             WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
@@ -73,9 +80,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
                 wifiLock.acquire();
             }
-        } catch (Throwable t) {
-            Log.e(TAG, "WifiLock error", t);
-        }
+        } catch (Throwable ignored) {}
     }
 
     private void startForegroundServiceNotification() {
@@ -90,7 +95,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Wi-Fi Phone Active")
-                    .setContentText("Ready to receive calls")
+                    .setContentText("Ready to receive calls (Ext: " + CallSignaling.detectMyExtensionId() + ")")
                     .setSmallIcon(android.R.drawable.sym_action_call)
                     .setContentIntent(pendingIntent)
                     .setOngoing(true)
@@ -107,7 +112,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 startForeground(NOTIFICATION_ID, notification);
             }
         } catch (Throwable t) {
-            Log.e(TAG, "Failed startForegroundServiceNotification", t);
+            Log.e(TAG, "startForeground error", t);
         }
     }
 
@@ -116,7 +121,6 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             try {
                 NotificationManager manager = getSystemService(NotificationManager.class);
                 if (manager != null) {
-                    // Ongoing listener channel
                     NotificationChannel channel = new NotificationChannel(
                             CHANNEL_ID,
                             "Wi-Fi Calling Active",
@@ -124,7 +128,6 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                     );
                     manager.createNotificationChannel(channel);
 
-                    // High-Priority Incoming Call Channel (breaks through lockscreen & sleep)
                     NotificationChannel callChannel = new NotificationChannel(
                             CALL_CHANNEL_ID,
                             "Incoming Calls",
@@ -135,7 +138,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                     manager.createNotificationChannel(callChannel);
                 }
             } catch (Throwable t) {
-                Log.e(TAG, "Error creating notification channels", t);
+                Log.e(TAG, "Notification channel error", t);
             }
         }
     }
@@ -146,12 +149,12 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     }
 
     @Override
-    public void onIncomingCall(String callerName, String callerIp) {
-        Log.i(TAG, "Incoming call received from " + callerName + " (" + callerIp + ")");
+    public void onIncomingCall(String callerName, String callerIp, String callerExt) {
+        Log.i(TAG, "Incoming call from " + callerName + " (Ext: " + callerExt + ", IP: " + callerIp + ")");
 
-        // 1. Send RINGING response back to caller immediately so caller knows receiver is ringing
+        // 1. Send RINGING response back to caller immediately
         if (signaling != null) {
-            signaling.sendCommand(callerIp, "RINGING", Build.MODEL);
+            signaling.sendCommand(callerExt, callerIp, "RINGING");
         }
 
         // 2. Wake screen from deep sleep
@@ -164,9 +167,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 );
                 fullWake.acquire(30000);
             }
-        } catch (Throwable t) {
-            Log.e(TAG, "Screen wake error", t);
-        }
+        } catch (Throwable ignored) {}
 
         // 3. Play loud ringtone immediately
         playIncomingRingtone();
@@ -176,6 +177,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             Intent callIntent = new Intent(this, IncomingCallActivity.class);
             callIntent.putExtra("CALLER_NAME", callerName);
             callIntent.putExtra("CALLER_IP", callerIp);
+            callIntent.putExtra("CALLER_EXT", callerExt);
             callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
 
             PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
@@ -198,14 +200,13 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 nm.notify(INCOMING_CALL_NOTIF_ID, notifBuilder.build());
             }
 
-            // Also launch directly for legacy Android versions like Vivo Android 5
             startActivity(callIntent);
         } catch (Throwable t) {
             Log.e(TAG, "Error displaying incoming call", t);
         }
     }
 
-    private synchronized void playIncomingRingtone() {
+    public synchronized void playIncomingRingtone() {
         try {
             stopIncomingRingtone();
             Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
@@ -223,11 +224,11 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             incomingRingtonePlayer.prepare();
             incomingRingtonePlayer.start();
         } catch (Throwable t) {
-            Log.e(TAG, "Error playing ringtone", t);
+            Log.e(TAG, "Ringtone error", t);
         }
     }
 
-    private synchronized void stopIncomingRingtone() {
+    public synchronized void stopIncomingRingtone() {
         try {
             if (incomingRingtonePlayer != null) {
                 if (incomingRingtonePlayer.isPlaying()) {
@@ -260,7 +261,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         dismissIncomingNotification();
     }
 
-    private void dismissIncomingNotification() {
+    public void dismissIncomingNotification() {
         try {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
@@ -278,6 +279,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
             if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         } catch (Throwable ignored) {}
+        instance = null;
     }
 
     @Override

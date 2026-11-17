@@ -542,6 +542,19 @@ library {
   repo_index {
   }
 }
+library {
+  maven_library {
+    groupId: "org.eclipse.paho"
+    artifactId: "org.eclipse.paho.client.mqttv3"
+    version: "1.2.5"
+  }
+  digests {
+    sha256: "Y\221B\207\255\254Pj(\325\350\027.\355&*\"`_=\364\324&\271\331/A\332\342D\201\205"
+  }
+  repo_index {
+    value: 1
+  }
+}
 library_dependencies {
   library_dep_index: 1
   library_dep_index: 2
@@ -813,6 +826,7 @@ module_dependencies {
   module_name: "base"
   dependency_index: 0
   dependency_index: 8
+  dependency_index: 45
   dependency_index: 27
   dependency_index: 28
 }
