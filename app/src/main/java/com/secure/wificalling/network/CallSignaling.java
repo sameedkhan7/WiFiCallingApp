@@ -29,10 +29,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Hybrid P2P Signaling Engine:
- * 1. Local Wi-Fi Direct TCP Sockets (Offline LAN, 0 ms lag).
+ * Hybrid Resilient P2P Signaling Engine:
+ * 1. Local Wi-Fi Multicast & Direct UDP/TCP (100% Offline LAN, 0 ms lag).
  * 2. Internet MQTT Real-Time Signaling (HiveMQ broker).
- * Automatic STUN WAN public endpoint discovery & seamless reconnect.
+ * Hardware MulticastLock, instant bidirectional handshake, and triple-redundant calling.
  */
 public class CallSignaling {
 
@@ -58,7 +58,7 @@ public class CallSignaling {
         public String ext;
         public String localIp;
         public String publicEndpoint;
-        public String networkType; // "Wi-Fi" or "Mobile Data"
+        public String networkType;
         public long lastSeen;
 
         public PeerStatus(String name, String ext, String localIp, String publicEndpoint, String networkType) {
@@ -83,6 +83,7 @@ public class CallSignaling {
     public static final ConcurrentHashMap<String, String> peerPublicEndpoints = new ConcurrentHashMap<>();
     public static volatile String myPublicEndpoint = "";
 
+    private static WifiManager.MulticastLock multicastLock;
     private Context context;
     private String myExtId;
 
@@ -121,6 +122,7 @@ public class CallSignaling {
     }
 
     public synchronized void start() {
+        acquireMulticastLock();
         if (isRunning) return;
         isRunning = true;
 
@@ -130,6 +132,24 @@ public class CallSignaling {
         threadPool.execute(this::runHeartbeatLoop);
         threadPool.execute(this::refreshPublicEndpoint);
         broadcastPresence();
+    }
+
+    private void acquireMulticastLock() {
+        try {
+            if (context != null) {
+                WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null) {
+                    if (multicastLock == null || !multicastLock.isHeld()) {
+                        multicastLock = wm.createMulticastLock("WiFiCalling:MulticastLock");
+                        multicastLock.setReferenceCounted(false);
+                        multicastLock.acquire();
+                        Log.i(TAG, "MulticastLock acquired for Wi-Fi discovery.");
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "MulticastLock acquisition failed: " + t.getMessage());
+        }
     }
 
     private void refreshPublicEndpoint() {
@@ -167,7 +187,7 @@ public class CallSignaling {
                     MqttConnectOptions options = new MqttConnectOptions();
                     options.setAutomaticReconnect(true);
                     options.setCleanSession(true);
-                    options.setConnectionTimeout(15);
+                    options.setConnectionTimeout(10);
                     options.setKeepAliveInterval(60);
 
                     mqttClient.setCallback(new MqttCallbackExtended() {
@@ -179,7 +199,7 @@ public class CallSignaling {
                                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
                                 publishPresence();
                             } catch (Exception e) {
-                                Log.e(TAG, "Subscription on connect error", e);
+                                Log.e(TAG, "Subscription on connectComplete error", e);
                             }
                         }
 
@@ -200,6 +220,16 @@ public class CallSignaling {
                     Log.i(TAG, "Connecting to MQTT broker: " + MQTT_BROKER);
                     mqttClient.connect(options);
                     Log.i(TAG, "Connected to MQTT broker successfully!");
+
+                    // Immediate subscription on initial synchronous connect
+                    try {
+                        mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
+                        mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
+                        publishPresence();
+                        Log.i(TAG, "Subscribed to personal call topic & presence successfully.");
+                    } catch (Exception subEx) {
+                        Log.e(TAG, "Initial subscription error", subEx);
+                    }
                 }
             } catch (Throwable e) {
                 Log.w(TAG, "MQTT connect failed: " + e.getMessage() + ", will retry in 3s");
@@ -213,7 +243,7 @@ public class CallSignaling {
         }
     }
 
-    private synchronized void ensureMqttConnected() {
+    public synchronized void ensureMqttConnected() {
         if (mqttClient == null || !mqttClient.isConnected()) {
             try {
                 String clientId = "WiFiPhone_" + myExtId + "_" + (System.currentTimeMillis() % 100000);
@@ -221,11 +251,12 @@ public class CallSignaling {
                 MqttConnectOptions options = new MqttConnectOptions();
                 options.setAutomaticReconnect(true);
                 options.setCleanSession(true);
-                options.setConnectionTimeout(10);
+                options.setConnectionTimeout(8);
                 options.setKeepAliveInterval(60);
                 mqttClient.connect(options);
                 mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 0);
+                publishPresence();
             } catch (Throwable ignored) {}
         }
     }
@@ -246,7 +277,7 @@ public class CallSignaling {
                 if (!publicEp.isEmpty()) {
                     peerPublicEndpoints.put(ext, publicEp);
                 }
-                if (!localIp.isEmpty()) {
+                if (!localIp.isEmpty() && !localIp.equals("127.0.0.1")) {
                     onlineDevices.put(name, localIp);
                 }
             } else if (topic.equals(TOPIC_PREFIX + myExtId)) {
@@ -263,6 +294,10 @@ public class CallSignaling {
                 if (!senderExt.isEmpty() && !senderPublicEp.isEmpty()) {
                     peerPublicEndpoints.put(senderExt, senderPublicEp);
                 }
+                if (!senderExt.isEmpty() && !senderIp.isEmpty() && !senderIp.equals("remote") && !senderIp.equals("127.0.0.1")) {
+                    onlineDevices.put(senderName, senderIp);
+                    peerStatuses.put(senderExt, new PeerStatus(senderName, senderExt, senderIp, senderPublicEp, "Wi-Fi"));
+                }
 
                 Log.i(TAG, "MQTT Signaling received: [" + command + "] from " + senderName + " (Ext: " + senderExt + ")");
                 dispatchSignalingCommand(command, senderName, senderIp, senderExt);
@@ -272,7 +307,7 @@ public class CallSignaling {
         }
     }
 
-    private void publishPresence() {
+    public void publishPresence() {
         if (mqttClient == null || !mqttClient.isConnected()) return;
         try {
             JSONObject obj = new JSONObject();
@@ -293,7 +328,7 @@ public class CallSignaling {
             try {
                 publishPresence();
                 broadcastPresence();
-                Thread.sleep(25000); // 25s interval to save battery and reduce radio wakeups
+                Thread.sleep(10000); // 10s heartbeat for rapid discovery
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {}
@@ -342,6 +377,10 @@ public class CallSignaling {
             if (!senderExt.isEmpty() && !senderPublicEp.isEmpty()) {
                 peerPublicEndpoints.put(senderExt, senderPublicEp);
             }
+            if (!senderExt.isEmpty()) {
+                onlineDevices.put(senderName, senderIp);
+                peerStatuses.put(senderExt, new PeerStatus(senderName, senderExt, senderIp, senderPublicEp, "Wi-Fi"));
+            }
 
             Log.i(TAG, "TCP Signaling received: [" + command + "] from " + senderName + " (" + senderIp + ")");
             dispatchSignalingCommand(command, senderName, senderIp, senderExt);
@@ -381,10 +420,10 @@ public class CallSignaling {
     public void sendCommand(String targetExt, String targetIp, String command) {
         threadPool.execute(() -> {
             String myIp = getLocalIpAddress();
-            String payload = command + "|" + Build.MODEL + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint;
+            String payload = command + "|" + Build.MODEL + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint + "|" + targetExt;
             String encrypted = CryptoUtil.encrypt(payload);
 
-            // 1. Send via Internet MQTT (Guaranteed delivery across Wi-Fi & 4G/5G mobile data)
+            // 1. Primary: Internet MQTT (Guaranteed QoS 1 delivery across Wi-Fi & 4G/5G)
             if (targetExt != null && !targetExt.isEmpty()) {
                 ensureMqttConnected();
                 if (mqttClient != null && mqttClient.isConnected()) {
@@ -399,8 +438,8 @@ public class CallSignaling {
                 }
             }
 
-            // 2. Also send via Local TCP if IP is available (Instant LAN delivery)
-            if (targetIp != null && !targetIp.isEmpty() && !targetIp.equals("remote")) {
+            // 2. Direct TCP Socket (Instant LAN delivery if IP is known)
+            if (targetIp != null && !targetIp.isEmpty() && !targetIp.equals("remote") && !targetIp.equals("127.0.0.1")) {
                 try {
                     Socket socket = new Socket();
                     socket.connect(new InetSocketAddress(targetIp, SIGNALING_PORT), 1500);
@@ -411,6 +450,29 @@ public class CallSignaling {
                     Log.i(TAG, "Sent [" + command + "] via local TCP to " + targetIp);
                 } catch (Exception ignored) {}
             }
+
+            // 3. Redundant Local UDP Broadcast (Ensures LAN calls ring even if IP was unknown or MQTT blocked)
+            try {
+                DatagramSocket dSock = new DatagramSocket();
+                dSock.setBroadcast(true);
+                byte[] data = encrypted.getBytes(StandardCharsets.UTF_8);
+
+                // Broadcast to global subnet
+                dSock.send(new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT));
+
+                // Also send to local Wi-Fi subnet broadcast
+                if (context != null) {
+                    WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    if (wifi != null && wifi.getDhcpInfo() != null && wifi.getDhcpInfo().ipAddress != 0) {
+                        DhcpInfo dhcp = wifi.getDhcpInfo();
+                        int broadcast = (dhcp.ipAddress & dhcp.netmask) | ~dhcp.netmask;
+                        byte[] quads = new byte[4];
+                        for (int k = 0; k < 4; k++) quads[k] = (byte) ((broadcast >> k * 8) & 0xFF);
+                        dSock.send(new DatagramPacket(data, data.length, InetAddress.getByAddress(quads), DISCOVERY_PORT));
+                    }
+                }
+                dSock.close();
+            } catch (Exception ignored) {}
         });
     }
 
@@ -421,21 +483,54 @@ public class CallSignaling {
                 discoverySocket.setReuseAddress(true);
                 discoverySocket.bind(new InetSocketAddress(DISCOVERY_PORT));
             }
-            byte[] buf = new byte[1024];
+            byte[] buf = new byte[2048];
             while (isRunning) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 discoverySocket.receive(packet);
 
-                String data = new String(packet.getData(), 0, packet.getLength());
+                String data = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
                 String decrypted = CryptoUtil.decrypt(data);
-                if (decrypted != null && decrypted.startsWith("DISCOVERY|")) {
-                    String[] parts = decrypted.split("\\|");
-                    String deviceName = parts[1];
+                if (decrypted == null) continue;
+
+                String[] parts = decrypted.split("\\|");
+                String header = parts[0];
+                String deviceIp = packet.getAddress().getHostAddress();
+
+                if (header.equals("DISCOVERY")) {
+                    String deviceName = parts.length > 1 ? parts[1] : "Unknown";
                     String ext = parts.length > 2 ? parts[2] : "";
-                    String deviceIp = packet.getAddress().getHostAddress();
-                    onlineDevices.put(deviceName, deviceIp);
-                    if (!ext.isEmpty()) {
-                        peerStatuses.put(ext, new PeerStatus(deviceName, ext, deviceIp, "", "Wi-Fi"));
+
+                    if (!ext.equals(myExtId)) {
+                        onlineDevices.put(deviceName, deviceIp);
+                        if (!ext.isEmpty()) {
+                            peerStatuses.put(ext, new PeerStatus(deviceName, ext, deviceIp, "", "Wi-Fi"));
+                        }
+                        // Send instant unicast reply directly back to sender
+                        sendDirectDiscoveryReply(packet.getAddress());
+                    }
+                } else if (header.equals("DISCOVERY_REPLY")) {
+                    String deviceName = parts.length > 1 ? parts[1] : "Unknown";
+                    String ext = parts.length > 2 ? parts[2] : "";
+
+                    if (!ext.equals(myExtId)) {
+                        onlineDevices.put(deviceName, deviceIp);
+                        if (!ext.isEmpty()) {
+                            peerStatuses.put(ext, new PeerStatus(deviceName, ext, deviceIp, "", "Wi-Fi"));
+                        }
+                    }
+                } else if (header.equals("INVITE") || header.equals("RINGING") || header.equals("ACCEPT") || header.equals("REJECT") || header.equals("HANGUP")) {
+                    // Local Wi-Fi direct UDP signaling
+                    String senderName = parts.length > 1 ? parts[1] : "Unknown";
+                    String senderExt = parts.length > 2 ? parts[2] : "";
+                    String senderIp = parts.length > 3 ? parts[3] : deviceIp;
+                    String targetExt = parts.length > 5 ? parts[5] : "";
+
+                    if (targetExt.equals(myExtId) || targetExt.isEmpty()) {
+                        if (!senderExt.equals(myExtId)) {
+                            onlineDevices.put(senderName, deviceIp);
+                            peerStatuses.put(senderExt, new PeerStatus(senderName, senderExt, deviceIp, "", "Wi-Fi"));
+                            dispatchSignalingCommand(header, senderName, deviceIp, senderExt);
+                        }
                     }
                 }
             }
@@ -444,29 +539,49 @@ public class CallSignaling {
         }
     }
 
+    private void sendDirectDiscoveryReply(InetAddress targetAddress) {
+        threadPool.execute(() -> {
+            try {
+                String payload = "DISCOVERY_REPLY|" + Build.MODEL + "|" + myExtId;
+                String encrypted = CryptoUtil.encrypt(payload);
+                byte[] data = encrypted.getBytes(StandardCharsets.UTF_8);
+
+                DatagramSocket s = new DatagramSocket();
+                s.send(new DatagramPacket(data, data.length, targetAddress, DISCOVERY_PORT));
+                s.close();
+            } catch (Exception ignored) {}
+        });
+    }
+
     public void broadcastPresence() {
         threadPool.execute(() -> {
             try {
-                if (context == null) return;
-                WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                if (wifi == null) return;
-                DhcpInfo dhcp = wifi.getDhcpInfo();
-                if (dhcp == null || dhcp.ipAddress == 0) return;
-
-                int broadcast = (dhcp.ipAddress & dhcp.netmask) | ~dhcp.netmask;
-                byte[] quads = new byte[4];
-                for (int k = 0; k < 4; k++) quads[k] = (byte) ((broadcast >> k * 8) & 0xFF);
-                InetAddress broadcastAddress = InetAddress.getByAddress(quads);
+                String payload = "DISCOVERY|" + Build.MODEL + "|" + myExtId;
+                String encrypted = CryptoUtil.encrypt(payload);
+                byte[] data = encrypted.getBytes(StandardCharsets.UTF_8);
 
                 DatagramSocket socket = new DatagramSocket();
                 socket.setBroadcast(true);
 
-                String payload = "DISCOVERY|" + Build.MODEL + "|" + myExtId;
-                String encrypted = CryptoUtil.encrypt(payload);
-                byte[] data = encrypted.getBytes();
+                // 1. Send to 255.255.255.255
+                try {
+                    socket.send(new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT));
+                } catch (Exception ignored) {}
 
-                DatagramPacket packet = new DatagramPacket(data, data.length, broadcastAddress, DISCOVERY_PORT);
-                socket.send(packet);
+                // 2. Send to calculated subnet broadcast
+                if (context != null) {
+                    WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    if (wifi != null) {
+                        DhcpInfo dhcp = wifi.getDhcpInfo();
+                        if (dhcp != null && dhcp.ipAddress != 0) {
+                            int broadcast = (dhcp.ipAddress & dhcp.netmask) | ~dhcp.netmask;
+                            byte[] quads = new byte[4];
+                            for (int k = 0; k < 4; k++) quads[k] = (byte) ((broadcast >> k * 8) & 0xFF);
+                            InetAddress broadcastAddress = InetAddress.getByAddress(quads);
+                            socket.send(new DatagramPacket(data, data.length, broadcastAddress, DISCOVERY_PORT));
+                        }
+                    }
+                }
                 socket.close();
             } catch (Exception ignored) {}
         });

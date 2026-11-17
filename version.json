@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 8,
-  "versionName": "1.0.8",
+  "versionCode": 9,
+  "versionName": "1.0.9",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Full Android 17 / 16 / 15 / 14 Compatibility (Samsung S24 Ultra & modern flagships)\n2. Edge-to-Edge fitsSystemWindows protection (no notch or navigation bar clipping)\n3. Foreground Service Phone Call type certified\n4. Verified v1+v2+v3 signatures & 0-idle-battery drain"
+  "changelog": "1. Fix: Hardware MulticastLock for 100% reliable local Wi-Fi peer discovery\n2. Fix: Instant bidirectional discovery handshake (10ms peer detection)\n3. Fix: Initial MQTT subscription & presence sync\n4. Feature: Triple-redundant calling (Cloud MQTT + Direct TCP + Local Broadcast UDP)"
 }

@@ -154,8 +154,16 @@ public class MainActivity extends Activity {
         if (tvMyDeviceIp != null) {
             tvMyDeviceIp.setText(getNetworkStatusString());
         }
+
+        // Announce presence immediately on app resume
+        try {
+            CallSignaling sig = new CallSignaling(this, null);
+            sig.broadcastPresence();
+            sig.publishPresence();
+        } catch (Throwable ignored) {}
+
         mainHandler.removeCallbacks(refreshRunnable);
-        mainHandler.postDelayed(refreshRunnable, 5000);
+        mainHandler.postDelayed(refreshRunnable, 4000);
     }
 
     @Override
@@ -529,7 +537,7 @@ public class MainActivity extends Activity {
                      "Extension ID: " + myExtId + "\n" +
                      "Network: " + getNetworkStatusString() + "\n" +
                      "Public WAN: " + (CallSignaling.myPublicEndpoint.isEmpty() ? "Discovering..." : CallSignaling.myPublicEndpoint) + "\n" +
-                     "Version: v1.0.8 (Android 14-17 Ready • Edge-to-Edge)\n" +
+                     "Version: v1.0.9 (Triple-Redundant Calling • Instant Discovery)\n" +
                      "Signaling: HiveMQ + P2P Direct\n" +
                      "Encryption: AES-256 Military Grade";
         builder.setMessage(msg);
