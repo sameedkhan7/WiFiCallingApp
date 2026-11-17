@@ -732,7 +732,6 @@ id checked
 id chronometer
 id collapseActionView
 id containerContacts
-id containerDiscovered
 id content
 id contentPanel
 id custom
@@ -831,7 +830,6 @@ id title_template
 id top
 id topPanel
 id tvCallerName
-id tvDiscoveredHeader
 id tvInCallName
 id tvInCallStatus
 id tvMyDeviceIp

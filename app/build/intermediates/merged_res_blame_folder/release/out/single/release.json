@@ -1,34 +1,38 @@
 [
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/xml_file_paths.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/xml/file_paths.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\xml_file_paths.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\xml\\file_paths.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/drawable_bg_circle_avatar.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/drawable/bg_circle_avatar.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\drawable_bg_circle_avatar.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\drawable\\bg_circle_avatar.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/layout_activity_in_call.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/layout/activity_in_call.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\layout_activity_incoming_call.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\layout\\activity_incoming_call.xml"
+    },
+    {
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\drawable_bg_button_reject.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\drawable\\bg_button_reject.xml"
     },
     {
         "merged": "com.secure.wificalling.app-merged_res-4:/layout_activity_main.xml.flat",
         "source": "com.secure.wificalling.app-main-5:/layout/activity_main.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/drawable_bg_button_call.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/drawable/bg_button_call.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\layout\\activity_main.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/layout_activity_incoming_call.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/layout/activity_incoming_call.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\layout_activity_in_call.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\layout\\activity_in_call.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/drawable_bg_button_reject.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/drawable/bg_button_reject.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\drawable_bg_button_call.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\drawable\\bg_button_call.xml"
     },
     {
-        "merged": "com.secure.wificalling.app-merged_res-4:/drawable_bg_card.xml.flat",
-        "source": "com.secure.wificalling.app-main-5:/drawable/bg_card.xml"
+        "merged": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-merged_res-4:\\drawable_bg_card.xml.flat",
+        "source": "C:\\Users\\SK\\.gradle\\daemon\\8.7\\com.secure.wificalling.app-main-5:\\drawable\\bg_card.xml"
     }
 ]

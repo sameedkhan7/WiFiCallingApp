@@ -42,8 +42,8 @@ public class CallSignaling {
 
     private static final String MQTT_BROKER = "tcp://broker.hivemq.com:1883";
     private static final String MQTT_BROKER_BACKUP = "tcp://broker.emqx.io:1883";
-    private static final String TOPIC_PREFIX = "wificalling/call/";
-    private static final String PRESENCE_PREFIX = "wificalling/presence/";
+    private static final String TOPIC_PREFIX = "wificalling_sk_2026/call/";
+    private static final String PRESENCE_PREFIX = "wificalling_sk_2026/presence/";
 
     public interface CallListener {
         void onIncomingCall(String callerName, String callerIp, String callerExt);
@@ -97,15 +97,15 @@ public class CallSignaling {
     }
 
     public static String detectMyExtensionId() {
-        String model = Build.MODEL.toLowerCase();
-        if (model.contains("vivo") || model.contains("y51l") || model.contains("pd1510")) {
-            return "101"; // Vivo Y51L
-        } else if (model.contains("oneplus") || model.contains("cph2381") || model.contains("nord")) {
-            return "102"; // OnePlus Nord CE 2 Lite
-        } else if (model.contains("s24") || model.contains("sm-s928") || model.contains("ultra")) {
-            return "103"; // Samsung S24 Ultra
-        } else if (model.contains("m35") || model.contains("sm-m35")) {
-            return "104"; // Samsung M35 5G
+        String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
+        if (info.contains("vivo") || info.contains("y51l") || info.contains("pd1510")) {
+            return "101"; // Vivo Y51L (Home Phone)
+        } else if (info.contains("cph2381") || info.contains("oneplus") || info.contains("nord") || info.contains("oppo")) {
+            return "102"; // OnePlus Nord CE 2 Lite (CPH2381)
+        } else if (info.contains("s24") || info.contains("sm-s928") || info.contains("ultra") || info.contains("e3q")) {
+            return "103"; // Samsung Galaxy S24 Ultra
+        } else if (info.contains("m35") || info.contains("sm-m35") || info.contains("m356")) {
+            return "104"; // Samsung Galaxy M35 5G
         }
         return "102"; // Default
     }
@@ -227,8 +227,8 @@ public class CallSignaling {
             obj.put("localIp", getLocalIpAddress());
             obj.put("netType", isWifiConnected() ? "Wi-Fi" : "Mobile Data");
 
-            MqttMessage msg = new MqttMessage(obj.toString().getBytes());
-            msg.setQos(0);
+            MqttMessage msg = new MqttMessage(obj.toString().getBytes("UTF-8"));
+            msg.setQos(1);
             mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
         } catch (Exception ignored) {}
     }

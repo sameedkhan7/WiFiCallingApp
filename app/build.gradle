@@ -10,8 +10,8 @@ android {
         applicationId "com.secure.wificalling"
         minSdk 21        // Android 5.0 (Vivo Y51L)
         targetSdk 34     // Android 14+ Native (OnePlus, Samsung S24 Ultra, M35)
-        versionCode 4
-        versionName "1.0.4"
+        versionCode 5
+        versionName "1.0.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

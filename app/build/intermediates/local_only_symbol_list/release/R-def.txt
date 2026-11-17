@@ -22,9 +22,7 @@ id btnTopAddContact
 id btnTopSettings
 id callChronometer
 id containerContacts
-id containerDiscovered
 id tvCallerName
-id tvDiscoveredHeader
 id tvInCallName
 id tvInCallStatus
 id tvMyDeviceIp
