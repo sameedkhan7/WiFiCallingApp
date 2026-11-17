@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 13,
-  "versionName": "1.1.3",
+  "versionCode": 14,
+  "versionName": "1.1.4",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Seamless Cellular 4G/5G to Home Wi-Fi cross-network calling\n2. Fix: SSL/TLS Priority on Mobile Data (bypasses carrier port 1883 blocking)\n3. Fix: Dual-Path audio hole punching (direct WAN + STUN symmetric reflection)\n4. Fix: Instant network handoff listener & automatic reconnect when switching networks"
+  "changelog": "1. Fix: Two-Way Crystal-Clear Audio across Cellular 4G/5G and Home Wi-Fi\n2. Fix: Hybrid UDP Direct + Real-Time Cloud MQTT Audio Relay (Bypasses Carrier Symmetric CGNAT)\n3. Fix: Zero-Echo Frame Sequence De-duplication Engine\n4. Fix: Jitter-free background audio queue for smooth voice transmission"
 }

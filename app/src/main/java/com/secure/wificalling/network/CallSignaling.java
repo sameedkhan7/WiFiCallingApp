@@ -56,17 +56,18 @@ public class CallSignaling {
     public static final int AUDIO_PORT = 50622;
 
     private static final String[] TCP_BROKERS = {
-        "tcp://broker.hivemq.com:1883",
-        "tcp://test.mosquitto.org:1883"
+        "tcp://test.mosquitto.org:1883",
+        "tcp://broker.emqx.io:1883"
     };
 
     private static final String[] SSL_BROKERS = {
-        "ssl://broker.hivemq.com:8883",
-        "ssl://test.mosquitto.org:8883"
+        "ssl://test.mosquitto.org:8883",
+        "ssl://broker.emqx.io:8883"
     };
 
     private static final String TOPIC_PREFIX = "wificall_sk_v6/call/";
     private static final String PRESENCE_PREFIX = "wificall_sk_v6/presence/";
+    private static final String AUDIO_RELAY_PREFIX = "wificall_sk_v6/audio/";
 
     public interface CallListener {
         void onIncomingCall(String callerName, String callerIp, String callerExt);
@@ -366,6 +367,13 @@ public class CallSignaling {
 
             @Override
             public void messageArrived(String topic, MqttMessage message) {
+                if (topic != null && topic.startsWith(AUDIO_RELAY_PREFIX)) {
+                    AudioRelayListener listener = activeAudioRelayListener;
+                    if (listener != null) {
+                        listener.onRelayAudioReceived(message.getPayload());
+                    }
+                    return;
+                }
                 handleMqttMessage(topic, new String(message.getPayload(), StandardCharsets.UTF_8));
             }
 
@@ -374,12 +382,32 @@ public class CallSignaling {
         });
     }
 
+    public interface AudioRelayListener {
+        void onRelayAudioReceived(byte[] audioData);
+    }
+
+    private static volatile AudioRelayListener activeAudioRelayListener;
+
+    public static void setAudioRelayListener(AudioRelayListener listener) {
+        activeAudioRelayListener = listener;
+    }
+
+    public static void sendRelayAudio(String targetExt, byte[] data) {
+        if (targetExt == null || targetExt.isEmpty() || mqttClient == null || !mqttClient.isConnected()) return;
+        try {
+            MqttMessage msg = new MqttMessage(data);
+            msg.setQos(0); // Zero-latency QoS 0 for live streaming
+            mqttClient.publish(AUDIO_RELAY_PREFIX + targetExt, msg);
+        } catch (Exception ignored) {}
+    }
+
     private void subscribeAllTopics() {
         try {
             if (mqttClient != null && mqttClient.isConnected()) {
                 mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 1);
-                Log.i(TAG, "Subscribed to personal call topic: " + TOPIC_PREFIX + myExtId + " & presence: " + PRESENCE_PREFIX + "#");
+                mqttClient.subscribe(AUDIO_RELAY_PREFIX + myExtId, 0); // Real-time redundant cloud audio stream
+                Log.i(TAG, "Subscribed to personal call topic: " + TOPIC_PREFIX + myExtId + ", presence: " + PRESENCE_PREFIX + "#, and audio: " + AUDIO_RELAY_PREFIX + myExtId);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in subscribeAllTopics", e);

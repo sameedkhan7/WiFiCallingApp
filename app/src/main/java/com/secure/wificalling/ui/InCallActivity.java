@@ -132,7 +132,7 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         }
 
         voiceEngine = new VoiceEngine(this);
-        voiceEngine.startCall(remoteIp, remotePublicEndpoint);
+        voiceEngine.startCall(remoteIp, remotePublicEndpoint, remoteExt);
     }
 
     private synchronized void endCall(boolean notifyRemote) {
