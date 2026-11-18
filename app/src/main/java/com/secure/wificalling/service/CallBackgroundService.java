@@ -87,23 +87,62 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         } catch (Throwable ignored) {}
     }
 
+    private static final String ACTION_KEEPALIVE = "com.secure.wificalling.ACTION_KEEPALIVE";
+    private PendingIntent keepAlivePendingIntent;
+
     private void acquireLocks() {
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:KeepAliveLock");
+                wakeLock.setReferenceCounted(false);
                 wakeLock.acquire();
             }
 
             WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
                 wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
+                wifiLock.setReferenceCounted(false);
                 wifiLock.acquire();
             }
             Log.i(TAG, "Acquired persistent locks for 24/7 background VoIP calling");
         } catch (Throwable t) {
             Log.w(TAG, "Error acquiring locks", t);
         }
+    }
+
+    private void scheduleKeepAliveAlarm() {
+        try {
+            android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (am != null) {
+                Intent intent = new Intent(this, CallBackgroundService.class);
+                intent.setAction(ACTION_KEEPALIVE);
+                int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT;
+                keepAlivePendingIntent = PendingIntent.getService(this, 102, intent, flags);
+
+                long triggerAt = android.os.SystemClock.elapsedRealtime() + 25000;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am.setExactAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, keepAlivePendingIntent);
+                } else {
+                    am.setExact(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, keepAlivePendingIntent);
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Error scheduling keepalive alarm", t);
+        }
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_KEEPALIVE.equals(intent.getAction())) {
+            if (signaling != null) {
+                signaling.publishPresence();
+            }
+            scheduleKeepAliveAlarm();
+            return START_STICKY;
+        }
+        scheduleKeepAliveAlarm();
+        return START_STICKY;
     }
 
     private void startForegroundServiceNotification() {
@@ -116,14 +155,19 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0
             );
 
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Internet Call Active")
                     .setContentText("Ready to receive calls (Ext: " + CallSignaling.detectMyExtensionId() + ")")
                     .setSmallIcon(android.R.drawable.sym_action_call)
                     .setContentIntent(pendingIntent)
-                    .setOngoing(true)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .build();
+                    .setOngoing(true);
+
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                builder.setPriority(NotificationCompat.PRIORITY_MAX);
+            } else {
+                builder.setPriority(NotificationCompat.PRIORITY_LOW);
+            }
+            Notification notification = builder.build();
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 14+ / 15 / 16 / 17
                 try {
@@ -166,10 +210,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         }
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY;
-    }
+
 
     @Override
     public void onIncomingCall(String callerName, String callerIp, String callerExt) {
@@ -329,6 +370,12 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             if (networkReceiver != null) {
                 try { unregisterReceiver(networkReceiver); } catch (Throwable ignored) {}
                 networkReceiver = null;
+            }
+            if (keepAlivePendingIntent != null) {
+                try {
+                    android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                    if (am != null) am.cancel(keepAlivePendingIntent);
+                } catch (Throwable ignored) {}
             }
             if (signaling != null) signaling.removeListener(this);
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();

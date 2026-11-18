@@ -124,22 +124,22 @@ public class CallSignaling {
         }
     }
 
-    public static String detectMyExtensionId(Context context) {
-        // 1. Strict Hardware Fingerprinting: Every physical phone is permanently bound to its unique ID.
-        // This eliminates the bug where a phone gets accidentally assigned another device's ID.
+    public static String detectLegacyHardwareExt() {
         String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
         if (info.contains("vivo") || info.contains("y51") || info.contains("pd1510") || info.contains("bbk") ||
             info.contains("1510") || info.contains("1601") || info.contains("1603") || info.contains("1606")) {
-            return "101"; // Vivo Y51L (Home Phone) - Fixed & Guaranteed
+            return "101"; // Vivo Y51L (Home Phone)
         } else if (info.contains("cph2381") || info.contains("oneplus") || info.contains("nord") || info.contains("oppo")) {
-            return "102"; // OnePlus Nord CE 2 Lite (CPH2381) - Fixed & Guaranteed
+            return "102"; // OnePlus Nord CE 2 Lite (CPH2381)
         } else if (info.contains("s24") || info.contains("sm-s928") || info.contains("ultra") || info.contains("e3q")) {
-            return "103"; // Samsung Galaxy S24 Ultra - Fixed & Guaranteed
+            return "103"; // Samsung Galaxy S24 Ultra
         } else if (info.contains("m35") || info.contains("sm-m35") || info.contains("m356")) {
-            return "104"; // Samsung Galaxy M35 5G - Fixed & Guaranteed
+            return "104"; // Samsung Galaxy M35 5G
         }
+        return "101";
+    }
 
-        // 2. Fallback for custom or unrecognized testing devices
+    public static String detectMyExtensionId(Context context) {
         if (context != null) {
             try {
                 SharedPreferences prefs = context.getSharedPreferences("WiFiCallingPrefs", Context.MODE_PRIVATE);
@@ -149,7 +149,7 @@ public class CallSignaling {
                 }
             } catch (Throwable ignored) {}
         }
-        return "101";
+        return detectLegacyHardwareExt();
     }
 
     public static String detectMyExtensionId() {
@@ -399,8 +399,14 @@ public class CallSignaling {
             if (mqttClient != null && mqttClient.isConnected()) {
                 mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 1);
-                mqttClient.subscribe(AUDIO_RELAY_PREFIX + myExtId, 0); // Real-time redundant cloud audio stream
-                Log.i(TAG, "Subscribed to personal call topic: " + TOPIC_PREFIX + myExtId + ", presence: " + PRESENCE_PREFIX + "#, and audio: " + AUDIO_RELAY_PREFIX + myExtId);
+                mqttClient.subscribe(AUDIO_RELAY_PREFIX + myExtId, 0); // Real-time cloud audio stream
+
+                String legacy = detectLegacyHardwareExt();
+                if (!legacy.equals(myExtId)) {
+                    mqttClient.subscribe(TOPIC_PREFIX + legacy, 1);
+                    mqttClient.subscribe(AUDIO_RELAY_PREFIX + legacy, 0);
+                }
+                Log.i(TAG, "Subscribed to personal call topics: [" + myExtId + (legacy.equals(myExtId) ? "" : ", legacy: " + legacy) + "], presence: " + PRESENCE_PREFIX + "#");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in subscribeAllTopics", e);
@@ -493,9 +499,10 @@ public class CallSignaling {
     public void publishPresence() {
         if (mqttClient == null || !mqttClient.isConnected()) return;
         try {
+            String profileName = com.secure.wificalling.ui.MainActivity.getMyProfileName(context);
             JSONObject obj = new JSONObject();
             obj.put("ext", myExtId);
-            obj.put("name", Build.MODEL);
+            obj.put("name", profileName);
             obj.put("localIp", getLocalIpAddress());
             obj.put("publicEp", myPublicEndpoint);
             obj.put("netType", isWifiConnected() ? "Wi-Fi" : "Mobile Data");
@@ -504,8 +511,18 @@ public class CallSignaling {
 
             MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
             msg.setQos(1);
-            msg.setRetained(true); // Retained presence: Guaranteed instant peer discovery with timestamp validation
+            msg.setRetained(true);
             mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
+
+            String legacy = detectLegacyHardwareExt();
+            if (!legacy.equals(myExtId)) {
+                JSONObject legacyObj = new JSONObject(obj.toString());
+                legacyObj.put("ext", legacy);
+                MqttMessage legacyMsg = new MqttMessage(legacyObj.toString().getBytes(StandardCharsets.UTF_8));
+                legacyMsg.setQos(1);
+                legacyMsg.setRetained(true);
+                mqttClient.publish(PRESENCE_PREFIX + legacy, legacyMsg);
+            }
         } catch (Exception ignored) {}
     }
 
@@ -607,12 +624,7 @@ public class CallSignaling {
         threadPool.execute(() -> {
             ensureMqttConnected();
             String myIp = getLocalIpAddress();
-            String mySenderName = Build.MODEL;
-            if (context != null) {
-                try {
-                    mySenderName = com.secure.wificalling.ui.MainActivity.getContactDisplayName(context, myExtId, Build.MODEL);
-                } catch (Throwable ignored) {}
-            }
+            String mySenderName = com.secure.wificalling.ui.MainActivity.getMyProfileName(context);
             String payload = command + "|" + mySenderName + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint + "|" + targetExt;
             String encrypted = CryptoUtil.encrypt(payload);
 

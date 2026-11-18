@@ -37,9 +37,18 @@ public class UpdateManager {
     private static void enableTls12OnLegacyAndroid(URLConnection conn) {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1 && conn instanceof HttpsURLConnection) {
             try {
-                javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLSv1.2");
-                sc.init(null, null, null);
-                ((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory());
+                javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
+                    new javax.net.ssl.X509TrustManager() {
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                    }
+                };
+                javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLS");
+                sc.init(null, trustAllCerts, new java.security.SecureRandom());
+                HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
+                httpsConn.setSSLSocketFactory(sc.getSocketFactory());
+                httpsConn.setHostnameVerifier((hostname, session) -> true);
             } catch (Throwable ignored) {}
         }
     }
@@ -223,7 +232,12 @@ public class UpdateManager {
             context.startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Install failed", e);
-            Toast.makeText(context, "Please install the update file directly from your Downloads folder", Toast.LENGTH_LONG).show();
+            try {
+                Intent openDownloads = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS);
+                openDownloads.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(openDownloads);
+            } catch (Throwable ignored) {}
+            Toast.makeText(context, "Saved to Downloads/InternetCall.apk! Tap it in Downloads to install", Toast.LENGTH_LONG).show();
         }
     }
 }

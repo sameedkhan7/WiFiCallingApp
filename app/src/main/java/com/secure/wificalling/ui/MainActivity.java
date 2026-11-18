@@ -120,9 +120,6 @@ public class MainActivity extends Activity {
         try {
             setContentView(R.layout.activity_main);
             prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            // Clear any stale manual overrides to guarantee 100% accurate hardware-bound IDs
-            prefs.edit().remove("SAVED_MY_EXT_ID").apply();
-            getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit().remove("SAVED_MY_EXT_ID").apply();
 
             myExtId = CallSignaling.detectMyExtensionId(this);
 
@@ -309,7 +306,12 @@ public class MainActivity extends Activity {
         details.setLayoutParams(detLp);
 
         TextView tvName = new TextView(this);
-        tvName.setText(contact.name + (isSelf ? " (This Device)" : ""));
+        if (isSelf) {
+            String profileName = getMyProfileName(this);
+            tvName.setText(profileName + " (This Device)");
+        } else {
+            tvName.setText(contact.name);
+        }
         tvName.setTextSize(17);
         tvName.setTypeface(null, Typeface.BOLD);
         tvName.setTextColor(Color.WHITE);
@@ -317,17 +319,17 @@ public class MainActivity extends Activity {
 
         TextView tvStatus = new TextView(this);
         if (isSelf) {
-            tvStatus.setText("🟢 Active • " + getNetworkStatusString() + " • Number: " + contact.ext);
+            tvStatus.setText("🟢 Active • " + getNetworkStatusString() + " • ID: " + contact.ext + " • Tap to edit");
             tvStatus.setTextColor(Color.parseColor("#34A853"));
         } else {
             boolean isOnline = CallSignaling.isPeerOnline(contact.ext);
             if (isOnline) {
                 CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
                 String netType = (ps != null && ps.networkType != null) ? ps.networkType : "Online";
-                tvStatus.setText("🟢 Online (" + netType + ") • Number: " + contact.ext);
+                tvStatus.setText("🟢 Online (" + netType + ") • ID: " + contact.ext);
                 tvStatus.setTextColor(Color.parseColor("#34A853"));
             } else {
-                tvStatus.setText("⚪ Offline / Standby • Number: " + contact.ext);
+                tvStatus.setText("⚪ Offline / Standby • ID: " + contact.ext);
                 tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
             }
         }
@@ -335,19 +337,19 @@ public class MainActivity extends Activity {
         details.addView(tvStatus);
         card.addView(details);
 
-        // Action: [CALL] for others, [YOU] for self
+        // Action: [CALL] for others, [EDIT] for self
         if (isSelf) {
             TextView selfBadge = new TextView(this);
             selfBadge.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(75), dpToPx(38)));
-            selfBadge.setText("YOU");
+            selfBadge.setText("EDIT");
             selfBadge.setGravity(Gravity.CENTER);
             selfBadge.setTextSize(12);
             selfBadge.setTypeface(null, Typeface.BOLD);
-            selfBadge.setTextColor(Color.parseColor("#888888"));
+            selfBadge.setTextColor(Color.parseColor("#34A853"));
             selfBadge.setBackgroundResource(R.drawable.bg_card);
             card.addView(selfBadge);
 
-            card.setOnClickListener(v -> Toast.makeText(this, "This is your current phone (" + Build.MODEL + ")", Toast.LENGTH_SHORT).show());
+            card.setOnClickListener(v -> showEditMyProfileDialog());
         } else {
             Button btnCall = new Button(this);
             btnCall.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(80), dpToPx(42)));
@@ -504,6 +506,78 @@ public class MainActivity extends Activity {
         builder.show();
     }
 
+    public static String getMyProfileName(Context context) {
+        if (context != null) {
+            try {
+                SharedPreferences p = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                String name = p.getString("MY_PROFILE_NAME", null);
+                if (name != null && !name.trim().isEmpty()) {
+                    return name.trim();
+                }
+            } catch (Throwable ignored) {}
+        }
+        String ext = CallSignaling.detectMyExtensionId(context);
+        if ("101".equals(ext)) return "Home Vivo Y51L";
+        if ("102".equals(ext)) return "My OnePlus";
+        if ("103".equals(ext)) return "Samsung Galaxy S24 Ultra";
+        if ("104".equals(ext)) return "Samsung Galaxy M35 5G";
+        return Build.MODEL;
+    }
+
+    private void showEditMyProfileDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Set Calling Profile");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dpToPx(20), dpToPx(10), dpToPx(20), dpToPx(10));
+
+        TextView tvHint = new TextView(this);
+        tvHint.setText("Set the Name and Calling ID that other phones will see when you call them:");
+        tvHint.setTextColor(Color.parseColor("#CCCCCC"));
+        tvHint.setTextSize(13);
+        layout.addView(tvHint);
+
+        final EditText etName = new EditText(this);
+        etName.setHint("Your Name (e.g. Sameed, Papa, Ghar)");
+        etName.setText(getMyProfileName(this));
+        layout.addView(etName);
+
+        final EditText etExt = new EditText(this);
+        etExt.setHint("Calling ID / Username (e.g. 102, sameed)");
+        etExt.setText(myExtId);
+        layout.addView(etExt);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String newName = etName.getText().toString().trim();
+            String newExt = etExt.getText().toString().trim();
+            if (!newName.isEmpty()) {
+                prefs.edit().putString("MY_PROFILE_NAME", newName).apply();
+            }
+            if (!newExt.isEmpty()) {
+                myExtId = newExt;
+                prefs.edit().putString("SAVED_MY_EXT_ID", newExt).apply();
+                getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit().putString("SAVED_MY_EXT_ID", newExt).apply();
+            }
+            loadContacts();
+            renderContactsUI();
+
+            // Broadcast presence immediately with updated profile name
+            try {
+                CallSignaling sig = new CallSignaling(this, null);
+                sig.start();
+                sig.publishPresence();
+                sig.broadcastPresence();
+            } catch (Throwable ignored) {}
+
+            Toast.makeText(this, "Profile updated! Name: " + newName + " | ID: " + myExtId, Toast.LENGTH_SHORT).show();
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
     public static String getContactDisplayName(Context context, String ext, String fallbackName) {
         if (context != null) {
             try {
@@ -539,13 +613,21 @@ public class MainActivity extends Activity {
             } catch (Throwable ignored) {}
         }
 
+        // Caller passed their custom profile name (e.g. "Sameed") -> Honor and display it directly!
+        if (fallbackName != null && !fallbackName.trim().isEmpty() &&
+            !fallbackName.equalsIgnoreCase("Unknown") &&
+            !fallbackName.startsWith("Extension") &&
+            !fallbackName.equals(Build.MODEL)) {
+            return fallbackName.trim();
+        }
+
         // Friendly default identities based on hardware mapping
         if ("101".equals(ext)) return "Home Vivo Y51L";
         if ("102".equals(ext)) return "My OnePlus (Main)";
         if ("103".equals(ext)) return "Samsung Galaxy S24 Ultra";
         if ("104".equals(ext)) return "Samsung Galaxy M35 5G";
 
-        return (fallbackName != null && !fallbackName.isEmpty()) ? fallbackName : "Extension " + ext;
+        return (fallbackName != null && !fallbackName.isEmpty()) ? fallbackName : "Calling ID: " + ext;
     }
 
     public static void openAutostartSettings(Context context) {

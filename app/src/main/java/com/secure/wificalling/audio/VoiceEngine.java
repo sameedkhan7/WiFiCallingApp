@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -82,9 +83,23 @@ public class VoiceEngine {
         }
     });
 
+    // Playout Jitter Buffer (absorbs mobile data network latency spikes & jitter)
+    private static class JitterFrame {
+        final int seqNum;
+        final byte[] pcm;
+        JitterFrame(int seqNum, byte[] pcm) {
+            this.seqNum = seqNum;
+            this.pcm = pcm;
+        }
+    }
+
+    private final PriorityBlockingQueue<JitterFrame> jitterBuffer = new PriorityBlockingQueue<>(32, (a, b) -> Integer.compare(a.seqNum, b.seqNum));
+
     // Asynchronous relay audio sending queue
-    private final BlockingQueue<byte[]> relaySendQueue = new LinkedBlockingQueue<>(24);
+    private final BlockingQueue<byte[]> relaySendQueue = new LinkedBlockingQueue<>(100);
     private Thread relaySendThread;
+    private Thread playoutThread;
+    private Thread udpReceiveThread;
 
     // Codec state instances
     private final AdpcmCodec.State encodeState = new AdpcmCodec.State();
@@ -165,7 +180,10 @@ public class VoiceEngine {
         new Thread(this::continuousNatHolePunch, "NatHolePunchThread").start();
 
         new Thread(this::recordAndSend, "AudioRecordThread").start();
-        new Thread(this::receiveAndPlay, "AudioTrackThread").start();
+        udpReceiveThread = new Thread(this::udpReceiverWorker, "UdpReceiveThread");
+        udpReceiveThread.start();
+        playoutThread = new Thread(this::playoutWorker, "PlayoutThread");
+        playoutThread.start();
     }
 
     public void startCall(String remoteIp, String remotePublicEndpoint) {
@@ -310,70 +328,43 @@ public class VoiceEngine {
         }
     }
 
-    private void receiveAndPlay() {
+    private void udpReceiverWorker() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+        byte[] inBuffer = new byte[PACKET_SIZE + 64];
+        DatagramPacket packet = new DatagramPacket(inBuffer, inBuffer.length);
 
-        int minBufferSize = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
-        int trackBufferSize = Math.max(minBufferSize, PCM_FRAME_SIZE * 4);
+        while (isCalling && sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
+            try {
+                sharedUdpSocket.receive(packet);
+                int len = packet.getLength();
 
-        try {
-            audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL,
-                    SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, trackBufferSize, AudioTrack.MODE_STREAM);
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                audioTrack.setVolume(1.0f);
-            } else {
-                audioTrack.setStereoVolume(1.0f, 1.0f);
-            }
-            audioTrack.play();
-
-            byte[] inBuffer = new byte[PACKET_SIZE + 64];
-            DatagramPacket packet = new DatagramPacket(inBuffer, inBuffer.length);
-
-            while (isCalling && sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
-                try {
-                    sharedUdpSocket.receive(packet);
-                    int len = packet.getLength();
-
-                    if (len >= HEADER_SIZE + ADPCM_FRAME_SIZE && inBuffer[0] == 0x57 && inBuffer[1] == 0x41) {
-                        targetAddress = packet.getAddress();
-                        targetPort = packet.getPort();
-                        hasLockedTarget = true;
-                        playAudioPacket(inBuffer, len);
-                    }
-                } catch (Exception e) {
-                    if (!isCalling) break;
+                if (len >= HEADER_SIZE + ADPCM_FRAME_SIZE && inBuffer[0] == 0x57 && inBuffer[1] == 0x41) {
+                    targetAddress = packet.getAddress();
+                    targetPort = packet.getPort();
+                    hasLockedTarget = true;
+                    enqueueAudioPacket(inBuffer, len);
                 }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "receiveAndPlay error", e);
-        } finally {
-            if (audioTrack != null) {
-                try {
-                    audioTrack.stop();
-                    audioTrack.release();
-                } catch (Exception ignored) {}
+            } catch (Exception e) {
+                if (!isCalling) break;
             }
         }
     }
 
     private void onRelayAudioReceived(byte[] audioData) {
         if (audioData != null && isCalling) {
-            playAudioPacket(audioData, audioData.length);
+            enqueueAudioPacket(audioData, audioData.length);
         }
     }
 
-    private final byte[] decompressedPcm = new byte[PCM_FRAME_SIZE];
-
     /**
-     * Unified, de-duplicated audio packet playback.
-     * Safely invoked concurrently by UDP receiver and Cloud Relay listener.
+     * Unified, de-duplicated audio packet ingestion.
+     * Decrypts, decompresses, and enqueues into jitter buffer with zero playout latency stalls.
      */
-    private void playAudioPacket(byte[] data, int length) {
+    private void enqueueAudioPacket(byte[] data, int length) {
         if (data == null || length < HEADER_SIZE + ADPCM_FRAME_SIZE || !isCalling) return;
 
         synchronized (playLock) {
-            if (audioTrack == null || !isCalling) return;
+            if (!isCalling) return;
 
             if (data[0] == 0x57 && data[1] == 0x41) {
                 int seqNum = ((data[2] & 0xFF) << 24) |
@@ -399,10 +390,90 @@ public class VoiceEngine {
                 CryptoUtil.decryptAudioBuffer(data, HEADER_SIZE, ADPCM_FRAME_SIZE);
 
                 // 2. Decompress 320 bytes ADPCM -> 1280 bytes PCM
-                AdpcmCodec.decode(data, HEADER_SIZE, ADPCM_FRAME_SIZE, decompressedPcm, 0, decodeState);
+                byte[] pcm = new byte[PCM_FRAME_SIZE];
+                AdpcmCodec.decode(data, HEADER_SIZE, ADPCM_FRAME_SIZE, pcm, 0, decodeState);
 
-                // 3. Play live PCM
-                audioTrack.write(decompressedPcm, 0, PCM_FRAME_SIZE);
+                // 3. Prevent jitter buffer bloat (cap at 16 frames = ~640ms max latency)
+                while (jitterBuffer.size() > 16) {
+                    jitterBuffer.poll();
+                }
+
+                // 4. Offer to playout jitter buffer
+                jitterBuffer.offer(new JitterFrame(seqNum, pcm));
+            }
+        }
+    }
+
+    /**
+     * Dedicated Playout Worker.
+     * Consumes PCM frames from Jitter Buffer at a stable 40ms cadence.
+     * Includes 3-frame (~120ms) initial pre-buffering and Packet Loss Concealment (PLC)
+     * so mobile carrier data jitter never results in audio cutting out or crackling.
+     */
+    private void playoutWorker() {
+        Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+
+        int minBufferSize = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
+        int trackBufferSize = Math.max(minBufferSize, PCM_FRAME_SIZE * 6);
+
+        try {
+            audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL,
+                    SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, trackBufferSize, AudioTrack.MODE_STREAM);
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                audioTrack.setVolume(1.0f);
+            } else {
+                audioTrack.setStereoVolume(1.0f, 1.0f);
+            }
+            audioTrack.play();
+
+            byte[] lastPcm = new byte[PCM_FRAME_SIZE];
+            byte[] plcFrame = new byte[PCM_FRAME_SIZE];
+            boolean prebuffered = false;
+            int consecutiveLoss = 0;
+
+            while (isCalling) {
+                // Adaptive pre-buffering: wait for 3 frames (~120ms) before starting playback to absorb jitter
+                if (!prebuffered) {
+                    long waitStart = System.currentTimeMillis();
+                    while (isCalling && jitterBuffer.size() < 3 && (System.currentTimeMillis() - waitStart < 150)) {
+                        Thread.sleep(10);
+                    }
+                    prebuffered = true;
+                }
+
+                JitterFrame frame = jitterBuffer.poll(45, TimeUnit.MILLISECONDS);
+                if (frame != null) {
+                    audioTrack.write(frame.pcm, 0, PCM_FRAME_SIZE);
+                    System.arraycopy(frame.pcm, 0, lastPcm, 0, PCM_FRAME_SIZE);
+                    consecutiveLoss = 0;
+                } else {
+                    // Packet delay or loss over mobile data - perform Packet Loss Concealment (PLC)
+                    if (consecutiveLoss < 3) {
+                        for (int i = 0; i < PCM_FRAME_SIZE; i += 2) {
+                            short sample = (short) ((lastPcm[i] & 0xFF) | (lastPcm[i + 1] << 8));
+                            sample = (short) (sample / 2); // 50% amplitude decay
+                            plcFrame[i] = (byte) (sample & 0xFF);
+                            plcFrame[i + 1] = (byte) ((sample >> 8) & 0xFF);
+                        }
+                        audioTrack.write(plcFrame, 0, PCM_FRAME_SIZE);
+                        System.arraycopy(plcFrame, 0, lastPcm, 0, PCM_FRAME_SIZE);
+                        consecutiveLoss++;
+                    } else {
+                        // Reset pre-buffering if network stalls for >150ms
+                        prebuffered = false;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playoutWorker error", e);
+        } finally {
+            if (audioTrack != null) {
+                try {
+                    audioTrack.stop();
+                    audioTrack.release();
+                } catch (Exception ignored) {}
+                audioTrack = null;
             }
         }
     }
@@ -425,10 +496,21 @@ public class VoiceEngine {
 
         CallSignaling.setAudioRelayListener(null);
         relaySendQueue.clear();
+        jitterBuffer.clear();
 
         if (relaySendThread != null) {
             relaySendThread.interrupt();
             relaySendThread = null;
+        }
+
+        if (udpReceiveThread != null) {
+            udpReceiveThread.interrupt();
+            udpReceiveThread = null;
+        }
+
+        if (playoutThread != null) {
+            playoutThread.interrupt();
+            playoutThread = null;
         }
 
         if (audioRecord != null) {
@@ -459,6 +541,12 @@ public class VoiceEngine {
         if (sharedUdpSocket != null && !sharedUdpSocket.isClosed()) {
             try { sharedUdpSocket.close(); } catch (Exception ignored) {}
             sharedUdpSocket = null;
+        }
+
+        AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (am != null) {
+            am.setMode(AudioManager.MODE_NORMAL);
+            am.setSpeakerphoneOn(false);
         }
     }
 }
