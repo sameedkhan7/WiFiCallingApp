@@ -1,6 +1,6 @@
 {
-  "versionCode": 23,
-  "versionName": "1.2.3",
+  "versionCode": 24,
+  "versionName": "1.2.4",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Custom Calling Profile & Usernames: Choose your own Name & Calling ID; others see your actual name when you call\n2. Smooth Mobile Data Audio: Adaptive 32-frame playout jitter buffer & PLC eliminates voice breaking over 4G/5G\n3. Vivo 24/7 Sleep Fix: Hardware RTC AlarmManager keeps Vivo Y51L connected even when screen is locked\n4. 1-Click Updates: Seamless in-app updating with zero external browser downloads\n5. Multi-Device Compatibility: Vivo Y51L, OnePlus, Samsung S24 Ultra & M35"
+  "changelog": "1. Onboarding Username Popup: Mandatory Name & Username setup dialog pops up right upon updating\n2. Self-Calling Bug Fixed: Your phone is permanently placed in 'This Device' at the bottom and never appears in contacts\n3. Pure Username Handles: Clean @username identities (e.g. @sameed, @ammi, @faiza) replace numerical IDs\n4. Dual Legacy Compatibility: Seamlessly connects with both @username and legacy numbers\n5. Multi-Device Compatibility: Vivo Y51L, OnePlus, Samsung S24 Ultra & M35"
 }

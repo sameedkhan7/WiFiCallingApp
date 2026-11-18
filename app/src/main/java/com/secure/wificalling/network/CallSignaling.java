@@ -156,21 +156,58 @@ public class CallSignaling {
         return detectMyExtensionId(null);
     }
 
+    public static String resolveExtAlias(String ext) {
+        if (ext == null) return null;
+        String e = ext.toLowerCase().trim();
+        if ("101".equals(e)) return "ammi";
+        if ("ammi".equals(e)) return "101";
+        if ("102".equals(e)) return "sameed";
+        if ("sameed".equals(e)) return "102";
+        if ("104".equals(e)) return "faiza";
+        if ("faiza".equals(e) || "faiza_appi".equals(e)) return "104";
+        if ("103".equals(e)) return "s24_ultra";
+        if ("s24_ultra".equals(e) || "s24".equals(e)) return "103";
+        return null;
+    }
+
     public static String getPeerPublicEndpoint(String ext) {
         if (ext == null) return "";
         String ep = peerPublicEndpoints.get(ext);
-        return ep != null ? ep : "";
+        if (ep != null && !ep.isEmpty()) return ep;
+        String alias = resolveExtAlias(ext);
+        if (alias != null) {
+            ep = peerPublicEndpoints.get(alias);
+            if (ep != null && !ep.isEmpty()) return ep;
+        }
+        return "";
+    }
+
+    public static PeerStatus getPeerStatus(String ext) {
+        if (ext == null) return null;
+        PeerStatus ps = peerStatuses.get(ext);
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 75000)) return ps;
+        String alias = resolveExtAlias(ext);
+        if (alias != null) {
+            PeerStatus psAlias = peerStatuses.get(alias);
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 75000)) return psAlias;
+        }
+        return null;
     }
 
     public static boolean isPeerOnline(String ext) {
         if (ext == null) return false;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps == null) return false;
-        if (System.currentTimeMillis() - ps.lastSeen > 75000) {
-            peerStatuses.remove(ext);
-            return false;
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 75000)) {
+            return true;
         }
-        return true;
+        String alias = resolveExtAlias(ext);
+        if (alias != null) {
+            PeerStatus psAlias = peerStatuses.get(alias);
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 75000)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public synchronized void start() {
@@ -391,6 +428,10 @@ public class CallSignaling {
             MqttMessage msg = new MqttMessage(data);
             msg.setQos(0); // Zero-latency QoS 0 for live streaming
             mqttClient.publish(AUDIO_RELAY_PREFIX + targetExt, msg);
+            String alias = resolveExtAlias(targetExt);
+            if (alias != null && !alias.equals(targetExt)) {
+                mqttClient.publish(AUDIO_RELAY_PREFIX + alias, msg);
+            }
         } catch (Exception ignored) {}
     }
 
@@ -634,7 +675,11 @@ public class CallSignaling {
                     MqttMessage msg = new MqttMessage(encrypted.getBytes(StandardCharsets.UTF_8));
                     msg.setQos(1);
                     mqttClient.publish(TOPIC_PREFIX + targetExt, msg);
-                    Log.i(TAG, "Sent [" + command + "] via MQTT to ext " + targetExt);
+                    String alias = resolveExtAlias(targetExt);
+                    if (alias != null && !alias.equals(targetExt)) {
+                        mqttClient.publish(TOPIC_PREFIX + alias, msg);
+                    }
+                    Log.i(TAG, "Sent [" + command + "] via MQTT to " + targetExt);
                 } catch (Exception e) {
                     Log.w(TAG, "MQTT send failed: " + e.getMessage());
                 }

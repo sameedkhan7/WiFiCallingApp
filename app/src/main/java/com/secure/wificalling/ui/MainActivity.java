@@ -36,6 +36,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -136,6 +137,7 @@ public class MainActivity extends Activity {
 
             loadContacts();
             renderContactsUI();
+            checkPromptUsernameRegistration();
 
             if (hasAllPermissions()) {
                 startCallService();
@@ -187,6 +189,113 @@ public class MainActivity extends Activity {
         return "🟢 Online (Mobile Data)";
     }
 
+    private void checkPromptUsernameRegistration() {
+        boolean hasRegistered = prefs.getBoolean("HAS_SET_USERNAME_V4", false);
+        if (!hasRegistered) {
+            showMandatoryUsernameSetupDialog();
+        }
+    }
+
+    private void showMandatoryUsernameSetupDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Choose Your Calling Profile");
+        builder.setCancelable(false);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dpToPx(22), dpToPx(14), dpToPx(22), dpToPx(14));
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText("Set your permanent Name and Username. Other phones will see your real name when you call:");
+        tvMsg.setTextColor(Color.parseColor("#DDDDDD"));
+        tvMsg.setTextSize(14);
+        layout.addView(tvMsg);
+
+        final EditText etName = new EditText(this);
+        etName.setHint("Your Name (e.g. Sameed, Ammi, Faiza)");
+        etName.setText(getMyProfileName(this));
+        layout.addView(etName);
+
+        final EditText etUser = new EditText(this);
+        etUser.setHint("Unique Username (e.g. sameed, ammi, faiza)");
+        String legacy = CallSignaling.detectLegacyHardwareExt();
+        String defaultUser = legacy.equals("101") ? "ammi" :
+                             legacy.equals("102") ? "sameed" :
+                             legacy.equals("104") ? "faiza" :
+                             legacy.equals("103") ? "s24_ultra" : myExtId;
+        etUser.setText(defaultUser);
+        layout.addView(etUser);
+
+        builder.setView(layout);
+        builder.setPositiveButton("Save & Start Calling", null);
+
+        AlertDialog dialog = builder.create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String name = etName.getText().toString().trim();
+            String username = etUser.getText().toString().trim().toLowerCase().replaceAll("[^a-z0-9_]", "");
+            if (name.isEmpty()) {
+                Toast.makeText(this, "Please enter your Name", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (username.isEmpty()) {
+                Toast.makeText(this, "Please enter a valid Username", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            prefs.edit()
+                    .putString("MY_PROFILE_NAME", name)
+                    .putString("MY_USERNAME", username)
+                    .putString("SAVED_MY_EXT_ID", username)
+                    .putBoolean("HAS_SET_USERNAME_V4", true)
+                    .apply();
+
+            getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit()
+                    .putString("SAVED_MY_EXT_ID", username)
+                    .apply();
+
+            myExtId = username;
+
+            cleanSelfFromContacts();
+            saveContacts();
+            renderContactsUI();
+
+            // Re-announce presence with updated profile name
+            try {
+                CallSignaling sig = new CallSignaling(this, null);
+                sig.start();
+                sig.publishPresence();
+                sig.broadcastPresence();
+            } catch (Throwable ignored) {}
+
+            dialog.dismiss();
+            Toast.makeText(this, "Username @" + username + " registered!", Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void cleanSelfFromContacts() {
+        String legacy = CallSignaling.detectLegacyHardwareExt();
+        String myName = getMyProfileName(this).toLowerCase().trim();
+        Iterator<ContactItem> it = contactList.iterator();
+        while (it.hasNext()) {
+            ContactItem c = it.next();
+            String cExt = c.ext.toLowerCase().trim();
+            String cName = c.name.toLowerCase().trim();
+            if (cExt.equals(myExtId.toLowerCase().trim()) || 
+                cExt.equals(legacy) || 
+                cExt.equals(CallSignaling.resolveExtAlias(myExtId)) ||
+                cName.equals(myName) ||
+                (cName.contains("oneplus") && (legacy.equals("102") || myExtId.contains("sameed") || myExtId.equals("102"))) ||
+                (cName.contains("vivo") && (legacy.equals("101") || myExtId.contains("ammi") || myExtId.equals("101"))) ||
+                (cName.contains("m35") && (legacy.equals("104") || myExtId.contains("faiza") || myExtId.equals("104"))) ||
+                (cName.contains("s24") && (legacy.equals("103") || myExtId.contains("s24") || myExtId.equals("103")))) {
+                it.remove();
+            }
+        }
+    }
+
     private void loadContacts() {
         contactList.clear();
 
@@ -202,6 +311,13 @@ public class MainActivity extends Activity {
                     String query = obj.optString("query", name);
                     String directIp = obj.optString("directIp", "");
                     long lastInteractionTime = obj.optLong("lastInteractionTime", 0);
+
+                    // Upgrade old extension IDs to clean usernames
+                    if ("101".equals(ext)) { ext = "ammi"; if (name.contains("Vivo") || name.contains("101")) name = "ammi"; }
+                    else if ("102".equals(ext)) { ext = "sameed"; if (name.contains("OnePlus") || name.contains("102")) name = "Sameed (OnePlus)"; }
+                    else if ("104".equals(ext)) { ext = "faiza"; if (name.contains("M35") || name.contains("104")) name = "faiza Appi"; }
+                    else if ("103".equals(ext)) { ext = "s24_ultra"; if (name.contains("S24") || name.contains("103")) name = "Samsung Galaxy S24 Ultra"; }
+
                     contactList.add(new ContactItem(ext, name, query, directIp, lastInteractionTime));
                 }
             } catch (Exception ignored) {}
@@ -209,12 +325,14 @@ public class MainActivity extends Activity {
 
         // If no contacts exist yet (first fresh run), add initial speed-dial contacts
         if (contactList.isEmpty()) {
-            contactList.add(new ContactItem("101", "Home Vivo Y51L", "Vivo", "", 4000));
-            contactList.add(new ContactItem("102", "My OnePlus (Main)", "OnePlus", "", 3000));
-            contactList.add(new ContactItem("103", "Samsung Galaxy S24 Ultra", "S24", "", 2000));
-            contactList.add(new ContactItem("104", "Samsung Galaxy M35 5G", "M35", "", 1000));
+            contactList.add(new ContactItem("ammi", "ammi", "ammi", "", 4000));
+            contactList.add(new ContactItem("sameed", "Sameed (OnePlus)", "Sameed", "", 3000));
+            contactList.add(new ContactItem("s24_ultra", "Samsung Galaxy S24 Ultra", "S24", "", 2000));
+            contactList.add(new ContactItem("faiza", "faiza Appi", "Faiza", "", 1000));
             saveContacts();
         }
+
+        cleanSelfFromContacts();
     }
 
     private void saveContacts() {
@@ -236,22 +354,13 @@ public class MainActivity extends Activity {
     private void renderContactsUI() {
         containerContacts.removeAllViews();
 
-        ContactItem selfContact = null;
-        List<ContactItem> others = new ArrayList<>();
-
-        for (ContactItem c : contactList) {
-            if (c.ext.equals(myExtId)) {
-                selfContact = c;
-            } else {
-                others.add(c);
-            }
-        }
+        cleanSelfFromContacts();
 
         // Sort non-self contacts by lastInteractionTime descending (most recent interaction on top #1)
-        Collections.sort(others, (a, b) -> Long.compare(b.lastInteractionTime, a.lastInteractionTime));
+        Collections.sort(contactList, (a, b) -> Long.compare(b.lastInteractionTime, a.lastInteractionTime));
 
         // 1. Render Top Speed-Dial Family Contacts (Other 3 Devices)
-        for (ContactItem contact : others) {
+        for (ContactItem contact : contactList) {
             LinearLayout card = createContactCard(contact, false);
             containerContacts.addView(card);
         }
@@ -269,11 +378,11 @@ public class MainActivity extends Activity {
         tvSelfHeader.setLayoutParams(headerLp);
         containerContacts.addView(tvSelfHeader);
 
-        // 3. Render Self Contact Card at the VERY BOTTOM
-        if (selfContact != null) {
-            LinearLayout selfCard = createContactCard(selfContact, true);
-            containerContacts.addView(selfCard);
-        }
+        // 3. Render Dedicated Self Contact Card at the VERY BOTTOM (Guaranteed 100% Always Rendered)
+        String myName = getMyProfileName(this);
+        ContactItem selfContact = new ContactItem(myExtId, myName, myName, "", 0);
+        LinearLayout selfCard = createContactCard(selfContact, true);
+        containerContacts.addView(selfCard);
     }
 
     private LinearLayout createContactCard(ContactItem contact, boolean isSelf) {
@@ -319,17 +428,17 @@ public class MainActivity extends Activity {
 
         TextView tvStatus = new TextView(this);
         if (isSelf) {
-            tvStatus.setText("🟢 Active • " + getNetworkStatusString() + " • ID: " + contact.ext + " • Tap to edit");
+            tvStatus.setText("🟢 Active • " + getNetworkStatusString() + " • @" + contact.ext + " • Tap to edit");
             tvStatus.setTextColor(Color.parseColor("#34A853"));
         } else {
             boolean isOnline = CallSignaling.isPeerOnline(contact.ext);
             if (isOnline) {
-                CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
+                CallSignaling.PeerStatus ps = CallSignaling.getPeerStatus(contact.ext);
                 String netType = (ps != null && ps.networkType != null) ? ps.networkType : "Online";
-                tvStatus.setText("🟢 Online (" + netType + ") • ID: " + contact.ext);
+                tvStatus.setText("🟢 Online (" + netType + ") • @" + contact.ext);
                 tvStatus.setTextColor(Color.parseColor("#34A853"));
             } else {
-                tvStatus.setText("⚪ Offline / Standby • ID: " + contact.ext);
+                tvStatus.setText("⚪ Offline / Standby • @" + contact.ext);
                 tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
             }
         }
@@ -386,8 +495,16 @@ public class MainActivity extends Activity {
     }
 
     private void initiateCall(ContactItem contact) {
-        if (contact.ext.equals(myExtId)) {
-            Toast.makeText(this, "Cannot call own device!", Toast.LENGTH_SHORT).show();
+        String legacy = CallSignaling.detectLegacyHardwareExt();
+        String myName = getMyProfileName(this).toLowerCase().trim();
+        String cExt = contact.ext.toLowerCase().trim();
+        String cName = contact.name.toLowerCase().trim();
+
+        if (cExt.equals(myExtId.toLowerCase().trim()) || 
+            cExt.equals(legacy) || 
+            cExt.equals(CallSignaling.resolveExtAlias(myExtId)) ||
+            cName.equals(myName)) {
+            Toast.makeText(this, "Cannot call your own device!", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -655,15 +772,8 @@ public class MainActivity extends Activity {
             Button btnUpdates = view.findViewById(R.id.btnCheckUpdates);
             Button btnClose = view.findViewById(R.id.btnCloseSettings);
 
-            String friendlyDevice = "Unknown Device";
-            if ("101".equals(myExtId)) friendlyDevice = "Home Vivo Y51L";
-            else if ("102".equals(myExtId)) friendlyDevice = "My OnePlus (CPH2381)";
-            else if ("103".equals(myExtId)) friendlyDevice = "Samsung Galaxy S24 Ultra";
-            else if ("104".equals(myExtId)) friendlyDevice = "Samsung Galaxy M35 5G";
-            else friendlyDevice = Build.MODEL;
-
-            tvDeviceName.setText(friendlyDevice + " (" + Build.MODEL + ")");
-            tvExtension.setText("My Calling Number: " + myExtId);
+            tvDeviceName.setText(getMyProfileName(this) + " (" + Build.MODEL + ")");
+            tvExtension.setText("My Username: @" + myExtId);
             tvNetwork.setText("Status: " + getNetworkStatusString());
             tvEncryption.setText("Security: AES-256 Military End-to-End Encrypted");
 
