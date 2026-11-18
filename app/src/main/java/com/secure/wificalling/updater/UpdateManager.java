@@ -156,13 +156,17 @@ public class UpdateManager {
     private static void installApk(Context context, File apkFile) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!context.getPackageManager().canRequestPackageInstalls()) {
-                    Intent manageIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                    manageIntent.setData(Uri.parse("package:" + context.getPackageName()));
-                    manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(manageIntent);
-                    Toast.makeText(context, "Please enable 'Allow from this source' to update", Toast.LENGTH_LONG).show();
-                    return;
+                try {
+                    if (!context.getPackageManager().canRequestPackageInstalls()) {
+                        Intent manageIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                        manageIntent.setData(Uri.parse("package:" + context.getPackageName()));
+                        manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(manageIntent);
+                        Toast.makeText(context, "Please enable 'Allow from this source' to complete update", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "canRequestPackageInstalls check error", t);
                 }
             }
 
@@ -179,7 +183,7 @@ public class UpdateManager {
             context.startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Install failed", e);
-            Toast.makeText(context, "Install prompt failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(context, "Please install the update file directly from your Downloads folder", Toast.LENGTH_LONG).show();
         }
     }
 }
