@@ -54,13 +54,13 @@ public class CallSignaling {
     public static final int AUDIO_PORT = 50622;
 
     private static final String[] TCP_BROKERS = {
-        "tcp://test.mosquitto.org:1883",
-        "tcp://broker.emqx.io:1883"
+        "tcp://broker.emqx.io:1883",
+        "tcp://test.mosquitto.org:1883"
     };
 
     private static final String[] SSL_BROKERS = {
-        "ssl://test.mosquitto.org:8883",
-        "ssl://broker.emqx.io:8883"
+        "ssl://broker.emqx.io:8883",
+        "ssl://test.mosquitto.org:8883"
     };
 
     private static final String TOPIC_PREFIX = "wificall_sk_v6/call/";
@@ -446,21 +446,13 @@ public class CallSignaling {
                     return;
                 }
 
-                // Discard stale retained messages or messages older than 75 seconds
-                if (msgTime > 0 && Math.abs(now - msgTime) > 75000) {
-                    peerStatuses.remove(ext);
-                    return;
-                }
-
                 String name = json.optString("name", "Device " + ext);
                 String localIp = json.optString("localIp", "");
                 String publicEp = json.optString("publicEp", "");
                 String netType = json.optString("netType", "Online");
 
                 PeerStatus newStatus = new PeerStatus(name, ext, localIp, publicEp, netType);
-                if (msgTime > 0) {
-                    newStatus.lastSeen = msgTime;
-                }
+                newStatus.lastSeen = System.currentTimeMillis();
                 peerStatuses.put(ext, newStatus);
                 if (!publicEp.isEmpty()) {
                     peerPublicEndpoints.put(ext, publicEp);
