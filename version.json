@@ -1,6 +1,6 @@
-﻿{
-  "versionCode": 21,
-  "versionName": "1.2.1",
+{
+  "versionCode": 22,
+  "versionName": "1.2.2",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. App Renamed to 'Internet Call': Professional WhatsApp-style clean interface\n2. Hidden Raw IPs: Replaced confusing technical IP addresses with clean Online (Wi-Fi) / Online (Mobile Data) and Calling Numbers\n3. Public & Scalable: Unlimited contacts and customizable Calling Numbers for any Android phone\n4. In-App Updates: Fully declared REQUEST_INSTALL_PACKAGES for reliable 1-click updates\n5. Cross-Network Audio: IMA-ADPCM 4:1 audio compression enables crystal-clear voice across 4G/5G mobile carriers and Wi-Fi"
+  "changelog": "1. True Internet Calling: Crystal-clear calling across India and globally over Wi-Fi & 4G/5G\n2. In-App 1-Click Updates: Seamless in-app updating with zero external browser downloads\n3. Single Cloud Broker: Ultra-fast broker.emqx.io for instant presence and 0-latency ring handshakes\n4. Robust UI: Clean calling numbers, persistent contacts, and real-time online status\n5. Multi-Device Compatibility: Vivo Y51L (Android 5.0), OnePlus, Samsung S24 Ultra & M35"
 }

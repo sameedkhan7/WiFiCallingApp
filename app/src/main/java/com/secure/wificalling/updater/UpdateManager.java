@@ -34,11 +34,22 @@ public class UpdateManager {
     private static final String TAG = "UpdateManager";
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/version.json";
 
+    private static void enableTls12OnLegacyAndroid(URLConnection conn) {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1 && conn instanceof HttpsURLConnection) {
+            try {
+                javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLSv1.2");
+                sc.init(null, null, null);
+                ((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory());
+            } catch (Throwable ignored) {}
+        }
+    }
+
     public static void checkUpdate(Context context, boolean showUpToDatePrompt) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 URL url = new URL(UPDATE_JSON_URL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                enableTls12OnLegacyAndroid(conn);
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
                 conn.setInstanceFollowRedirects(true);
@@ -61,7 +72,17 @@ public class UpdateManager {
                 }
                 in.close();
 
-                JSONObject json = new JSONObject(sb.toString());
+                String rawJson = sb.toString().trim();
+                if (rawJson.startsWith("\uFEFF")) {
+                    rawJson = rawJson.substring(1).trim();
+                }
+                int firstBrace = rawJson.indexOf('{');
+                int lastBrace = rawJson.lastIndexOf('}');
+                if (firstBrace != -1 && lastBrace > firstBrace) {
+                    rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+                }
+
+                JSONObject json = new JSONObject(rawJson);
                 int remoteVersionCode = json.optInt("versionCode", 1);
                 String remoteVersionName = json.optString("versionName", "1.0.0");
                 String downloadUrl = json.optString("downloadUrl", "");
@@ -112,6 +133,7 @@ public class UpdateManager {
             try {
                 URL url = new URL(downloadUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                enableTls12OnLegacyAndroid(conn);
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(15000);
                 conn.setInstanceFollowRedirects(true);
