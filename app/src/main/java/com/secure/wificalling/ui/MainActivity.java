@@ -325,21 +325,16 @@ public class MainActivity extends Activity {
             tvStatus.setText("🟢 Active • " + getNetworkStatusString());
             tvStatus.setTextColor(Color.parseColor("#34A853"));
         } else {
-            CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
-            boolean isOnline = (ps != null && (System.currentTimeMillis() - ps.lastSeen < 65000));
+            boolean isOnline = CallSignaling.isPeerOnline(contact.ext);
             if (isOnline) {
-                String ipPart = (!ps.localIp.isEmpty() && !ps.localIp.equals("127.0.0.1")) ? ": " + ps.localIp : "";
-                tvStatus.setText("🟢 Online (" + ps.networkType + ipPart + ")");
+                CallSignaling.PeerStatus ps = CallSignaling.peerStatuses.get(contact.ext);
+                String ipPart = (ps != null && !ps.localIp.isEmpty() && !ps.localIp.equals("127.0.0.1")) ? ": " + ps.localIp : "";
+                String netType = (ps != null) ? ps.networkType : "Online";
+                tvStatus.setText("🟢 Online (" + netType + ipPart + ")");
                 tvStatus.setTextColor(Color.parseColor("#34A853"));
             } else {
-                String lanIp = resolveLanIp(contact);
-                if (lanIp != null && !lanIp.isEmpty() && !lanIp.equals("127.0.0.1")) {
-                    tvStatus.setText("🟢 Online (Local Wi-Fi)");
-                    tvStatus.setTextColor(Color.parseColor("#34A853"));
-                } else {
-                    tvStatus.setText("⚪ Offline / Standby");
-                    tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
-                }
+                tvStatus.setText("⚪ Offline / Standby");
+                tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
             }
         }
         tvStatus.setTextSize(12);
@@ -377,6 +372,9 @@ public class MainActivity extends Activity {
     }
 
     private String resolveLanIp(ContactItem contact) {
+        if (!CallSignaling.isPeerOnline(contact.ext)) {
+            return null; // Peer is currently offline
+        }
         if (contact.directIp != null && !contact.directIp.trim().isEmpty()) {
             return contact.directIp.trim();
         }
@@ -386,15 +384,6 @@ public class MainActivity extends Activity {
             // Only return LAN IP if both devices are on the SAME local subnet!
             if (CallSignaling.isSameSubnet(myLocalIp, ps.localIp)) {
                 return ps.localIp;
-            }
-        }
-        for (String dev : CallSignaling.onlineDevices.keySet()) {
-            if (dev.toLowerCase().contains(contact.query.toLowerCase()) ||
-                dev.toLowerCase().contains(contact.name.toLowerCase())) {
-                String ip = CallSignaling.onlineDevices.get(dev);
-                if (ip != null && !ip.equals("127.0.0.1") && CallSignaling.isSameSubnet(myLocalIp, ip)) {
-                    return ip;
-                }
             }
         }
         return null;

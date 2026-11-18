@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 17,
-  "versionName": "1.1.7",
+  "versionCode": 18,
+  "versionName": "1.1.8",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Play Protect: Removed dropper permission (REQUEST_INSTALL_PACKAGES) and cleartext traffic\n2. Play Protect: Fully compliant with Google Play security and verified TLS standards\n3. Reliability: Vivo background auto-resurrect on swipe-clear & hardware-bound IDs\n4. Experience: Google Dialer styled settings & saved contact name priority"
+  "changelog": "1. Real-time Presence: Eliminated ghost online status for uninstalled/inactive devices (non-retained live heartbeats)\n2. Stale Cache Purge: Purged old retained presence on cloud brokers\n3. Google Play Protect: Fully compliant, clean permissions, verified TLS standards"
 }

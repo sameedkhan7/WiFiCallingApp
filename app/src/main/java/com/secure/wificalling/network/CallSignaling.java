@@ -162,6 +162,17 @@ public class CallSignaling {
         return ep != null ? ep : "";
     }
 
+    public static boolean isPeerOnline(String ext) {
+        if (ext == null) return false;
+        PeerStatus ps = peerStatuses.get(ext);
+        if (ps == null) return false;
+        if (System.currentTimeMillis() - ps.lastSeen > 20000) {
+            peerStatuses.remove(ext);
+            return false;
+        }
+        return true;
+    }
+
     public synchronized void start() {
         acquireMulticastLock();
         if (isRunning) return;
@@ -427,12 +438,17 @@ public class CallSignaling {
                 String ext = json.optString("ext");
                 if (ext.equals(myExtId)) return;
 
+                long msgTime = json.optLong("time", 0);
+                long now = System.currentTimeMillis();
+
                 if ("offline".equalsIgnoreCase(json.optString("status"))) {
-                    long offlineTime = json.optLong("time", 0);
-                    PeerStatus cur = peerStatuses.get(ext);
-                    if (cur == null || offlineTime >= cur.lastSeen) {
-                        peerStatuses.remove(ext);
-                    }
+                    peerStatuses.remove(ext);
+                    return;
+                }
+
+                // Discard stale retained messages or messages older than 20 seconds
+                if (msgTime > 0 && Math.abs(now - msgTime) > 20000) {
+                    peerStatuses.remove(ext);
                     return;
                 }
 
@@ -492,7 +508,7 @@ public class CallSignaling {
 
             MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
             msg.setQos(1);
-            msg.setRetained(true); // Retained presence: Guaranteed instant peer discovery
+            msg.setRetained(false); // Dynamic presence: Never retain periodic heartbeats so inactive devices show offline
             mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
         } catch (Exception ignored) {}
     }
