@@ -19,13 +19,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.concurrent.Executors;
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 /**
  * 1-Click In-App Auto Updater via GitHub Releases / Raw Repo.
@@ -37,31 +32,11 @@ public class UpdateManager {
     private static final String TAG = "UpdateManager";
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/version.json";
 
-    private static void configureSslForLegacyAndroid(URLConnection conn) {
-        if (conn instanceof HttpsURLConnection) {
-            try {
-                TrustManager[] trustAllCerts = new TrustManager[]{
-                        new X509TrustManager() {
-                            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                        }
-                };
-                SSLContext sc = SSLContext.getInstance("TLS");
-                sc.init(null, trustAllCerts, new SecureRandom());
-                HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
-                httpsConn.setSSLSocketFactory(sc.getSocketFactory());
-                httpsConn.setHostnameVerifier((hostname, session) -> true);
-            } catch (Exception ignored) {}
-        }
-    }
-
     public static void checkUpdate(Context context, boolean showUpToDatePrompt) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 URL url = new URL(UPDATE_JSON_URL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                configureSslForLegacyAndroid(conn);
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
                 conn.setInstanceFollowRedirects(true);
@@ -135,7 +110,6 @@ public class UpdateManager {
             try {
                 URL url = new URL(downloadUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                configureSslForLegacyAndroid(conn);
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(15000);
                 conn.setInstanceFollowRedirects(true);

@@ -564,27 +564,12 @@ public class MainActivity extends Activity {
 
     public static void openAutostartSettings(Context context) {
         try {
-            Intent intent = new Intent();
-            String brand = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
-            if (brand.contains("vivo")) {
-                intent.setComponent(new ComponentName("com.iqoo.secure", "com.iqoo.secure.safeguard.PurviewTabActivity"));
-            } else if (brand.contains("oppo") || brand.contains("oneplus")) {
-                intent.setComponent(new ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
-            } else if (brand.contains("xiaomi")) {
-                intent.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
-            } else {
-                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(Uri.parse("package:" + context.getPackageName()));
-            }
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + context.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
         } catch (Throwable t) {
-            try {
-                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                fallback.setData(Uri.parse("package:" + context.getPackageName()));
-                context.startActivity(fallback);
-            } catch (Throwable ignored) {
-                Toast.makeText(context, "Please open Settings > Apps > Wi-Fi Phone > Permissions", Toast.LENGTH_LONG).show();
-            }
+            Toast.makeText(context, "Please open Settings > Apps > Wi-Fi Phone > Permissions", Toast.LENGTH_LONG).show();
         }
     }
 

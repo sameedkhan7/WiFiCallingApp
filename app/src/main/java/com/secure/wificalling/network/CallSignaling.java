@@ -38,8 +38,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 /**
  * Universal Resilient P2P & Cloud Hybrid Signaling Engine:
@@ -216,23 +214,6 @@ public class CallSignaling {
         }
     }
 
-    private static SSLSocketFactory getPermissiveSSLSocketFactory() {
-        try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
-            };
-            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-            return sslContext.getSocketFactory();
-        } catch (Exception e) {
-            return (SSLSocketFactory) SSLSocketFactory.getDefault();
-        }
-    }
-
     public void reconnect() {
         threadPool.execute(() -> {
             synchronized (MQTT_LOCK) {
@@ -295,9 +276,7 @@ public class CallSignaling {
             mqttClient = new MqttClient(SSL_BROKERS[0], clientId, new MemoryPersistence());
             MqttConnectOptions sslOptions = new MqttConnectOptions();
             sslOptions.setServerURIs(SSL_BROKERS);
-            sslOptions.setSocketFactory(getPermissiveSSLSocketFactory());
-            sslOptions.setHttpsHostnameVerificationEnabled(false);
-            sslOptions.setSSLHostnameVerifier((hostname, session) -> true);
+            sslOptions.setSocketFactory(SSLSocketFactory.getDefault());
             sslOptions.setAutomaticReconnect(true);
             sslOptions.setCleanSession(true);
             sslOptions.setConnectionTimeout(4);
