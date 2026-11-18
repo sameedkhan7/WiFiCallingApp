@@ -117,7 +117,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             );
 
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Wi-Fi Phone Active")
+                    .setContentTitle("Internet Call Active")
                     .setContentText("Ready to receive calls (Ext: " + CallSignaling.detectMyExtensionId() + ")")
                     .setSmallIcon(android.R.drawable.sym_action_call)
                     .setContentIntent(pendingIntent)

@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 20,
-  "versionName": "1.2.0",
+  "versionCode": 21,
+  "versionName": "1.2.1",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. In-App Updates: Restored REQUEST_INSTALL_PACKAGES permission and safe intent triggers for 1-click in-app updating\n2. Cross-Network Audio: IMA-ADPCM 4:1 audio compression enables crystal-clear voice across 4G/5G mobile carriers and Wi-Fi\n3. Caller Name Priority: Saved contact names (e.g. Sameed) always display on incoming and in-call screens instead of hardware chip IDs\n4. Vivo 24/7 Background Persistence: Upgraded wake locks and 75s presence heartbeats keep Vivo always online even when screen is off\n5. Multi-Device: Full compatibility for Vivo Y51L (Android 5.0), OnePlus, Samsung Galaxy M35 & S24 Ultra"
+  "changelog": "1. App Renamed to 'Internet Call': Professional WhatsApp-style clean interface\n2. Hidden Raw IPs: Replaced confusing technical IP addresses with clean Online (Wi-Fi) / Online (Mobile Data) and Calling Numbers\n3. Public & Scalable: Unlimited contacts and customizable Calling Numbers for any Android phone\n4. In-App Updates: Fully declared REQUEST_INSTALL_PACKAGES for reliable 1-click updates\n5. Cross-Network Audio: IMA-ADPCM 4:1 audio compression enables crystal-clear voice across 4G/5G mobile carriers and Wi-Fi"
 }

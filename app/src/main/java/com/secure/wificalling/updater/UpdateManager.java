@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -14,6 +15,7 @@ import android.widget.Toast;
 import androidx.core.content.FileProvider;
 import org.json.JSONObject;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -137,6 +139,22 @@ public class UpdateManager {
                 output.flush();
                 output.close();
                 input.close();
+
+                try {
+                    File publicDownloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (publicDownloadDir != null && publicDownloadDir.exists()) {
+                        File publicApk = new File(publicDownloadDir, "InternetCall.apk");
+                        FileInputStream src = new FileInputStream(updateFile);
+                        FileOutputStream dst = new FileOutputStream(publicApk);
+                        byte[] buf = new byte[8192];
+                        int len;
+                        while ((len = src.read(buf)) > 0) {
+                            dst.write(buf, 0, len);
+                        }
+                        src.close();
+                        dst.close();
+                    }
+                } catch (Throwable ignored) {}
 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     progress.dismiss();
