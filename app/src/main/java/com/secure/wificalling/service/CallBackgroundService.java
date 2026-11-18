@@ -129,19 +129,11 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .build();
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 14+ / 15 / 16 / 17
                 try {
-                    int serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 14+ / 15 / 16 / 17
-                        serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL;
-                    }
-                    startForeground(NOTIFICATION_ID, notification, serviceType);
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL);
                 } catch (Throwable t1) {
-                    try {
-                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
-                    } catch (Throwable t2) {
-                        startForeground(NOTIFICATION_ID, notification);
-                    }
+                    startForeground(NOTIFICATION_ID, notification);
                 }
             } else {
                 startForeground(NOTIFICATION_ID, notification);
