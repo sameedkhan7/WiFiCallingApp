@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 14,
-  "versionName": "1.1.4",
+  "versionCode": 15,
+  "versionName": "1.1.5",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Fix: Two-Way Crystal-Clear Audio across Cellular 4G/5G and Home Wi-Fi\n2. Fix: Hybrid UDP Direct + Real-Time Cloud MQTT Audio Relay (Bypasses Carrier Symmetric CGNAT)\n3. Fix: Zero-Echo Frame Sequence De-duplication Engine\n4. Fix: Jitter-free background audio queue for smooth voice transmission"
+  "changelog": "1. Fix: Persistent Background Calling on Vivo Y51L & Android 5 (Auto-resurrect on swipe-clear & BootReceiver)\n2. Fix: Display user's saved contact name (e.g. Sameed) instead of manufacturer chip ID (CPH2381)\n3. Fix: Permanent Hardware-Bound Device IDs (Fixes Vivo accidental 104 switch)\n4. Redesign: Google Dialer / Google Phone styled Settings dialog with one-click Autostart & Battery permission launcher"
 }

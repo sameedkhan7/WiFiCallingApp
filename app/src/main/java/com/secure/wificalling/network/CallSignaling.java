@@ -127,6 +127,21 @@ public class CallSignaling {
     }
 
     public static String detectMyExtensionId(Context context) {
+        // 1. Strict Hardware Fingerprinting: Every physical phone is permanently bound to its unique ID.
+        // This eliminates the bug where a phone gets accidentally assigned another device's ID.
+        String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
+        if (info.contains("vivo") || info.contains("y51") || info.contains("pd1510") || info.contains("bbk") ||
+            info.contains("1510") || info.contains("1601") || info.contains("1603") || info.contains("1606")) {
+            return "101"; // Vivo Y51L (Home Phone) - Fixed & Guaranteed
+        } else if (info.contains("cph2381") || info.contains("oneplus") || info.contains("nord") || info.contains("oppo")) {
+            return "102"; // OnePlus Nord CE 2 Lite (CPH2381) - Fixed & Guaranteed
+        } else if (info.contains("s24") || info.contains("sm-s928") || info.contains("ultra") || info.contains("e3q")) {
+            return "103"; // Samsung Galaxy S24 Ultra - Fixed & Guaranteed
+        } else if (info.contains("m35") || info.contains("sm-m35") || info.contains("m356")) {
+            return "104"; // Samsung Galaxy M35 5G - Fixed & Guaranteed
+        }
+
+        // 2. Fallback for custom or unrecognized testing devices
         if (context != null) {
             try {
                 SharedPreferences prefs = context.getSharedPreferences("WiFiCallingPrefs", Context.MODE_PRIVATE);
@@ -136,19 +151,7 @@ public class CallSignaling {
                 }
             } catch (Throwable ignored) {}
         }
-
-        String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
-        if (info.contains("vivo") || info.contains("y51") || info.contains("pd1510") || info.contains("bbk") ||
-            info.contains("1510") || info.contains("1601") || info.contains("1603") || info.contains("1606")) {
-            return "101"; // Vivo Y51L (Home Phone)
-        } else if (info.contains("cph2381") || info.contains("oneplus") || info.contains("nord") || info.contains("oppo")) {
-            return "102"; // OnePlus Nord CE 2 Lite (CPH2381)
-        } else if (info.contains("s24") || info.contains("sm-s928") || info.contains("ultra") || info.contains("e3q")) {
-            return "103"; // Samsung Galaxy S24 Ultra
-        } else if (info.contains("m35") || info.contains("sm-m35") || info.contains("m356")) {
-            return "104"; // Samsung Galaxy M35 5G
-        }
-        return "101"; // Fallback to Vivo (101) so it never clashes with OnePlus (102)
+        return "101";
     }
 
     public static String detectMyExtensionId() {

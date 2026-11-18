@@ -42,8 +42,10 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
         callerExt = getIntent().getStringExtra("CALLER_EXT");
         callerPublicEp = getIntent().getStringExtra("CALLER_PUBLIC_EP");
 
+        String displayName = MainActivity.getContactDisplayName(this, callerExt, callerName);
+
         TextView tvCaller = findViewById(R.id.tvCallerName);
-        tvCaller.setText(callerName != null ? callerName : "Incoming Wi-Fi Call");
+        tvCaller.setText(displayName);
 
         signaling = new CallSignaling(this, this);
 
@@ -81,7 +83,7 @@ public class IncomingCallActivity extends Activity implements CallSignaling.Call
         }
 
         Intent inCall = new Intent(this, InCallActivity.class);
-        inCall.putExtra("REMOTE_NAME", callerName);
+        inCall.putExtra("REMOTE_NAME", MainActivity.getContactDisplayName(this, callerExt, callerName));
         inCall.putExtra("REMOTE_IP", callerIp);
         inCall.putExtra("REMOTE_EXT", callerExt);
         inCall.putExtra("REMOTE_PUBLIC_EP", callerPublicEp != null ? callerPublicEp : CallSignaling.getPeerPublicEndpoint(callerExt));

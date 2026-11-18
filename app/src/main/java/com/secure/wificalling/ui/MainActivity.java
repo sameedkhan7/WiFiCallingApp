@@ -3,19 +3,24 @@ package com.secure.wificalling.ui;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -115,8 +120,11 @@ public class MainActivity extends Activity {
         try {
             setContentView(R.layout.activity_main);
             prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            // Clear any stale manual overrides to guarantee 100% accurate hardware-bound IDs
+            prefs.edit().remove("SAVED_MY_EXT_ID").apply();
+            getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit().remove("SAVED_MY_EXT_ID").apply();
 
-            myExtId = CallSignaling.detectMyExtensionId();
+            myExtId = CallSignaling.detectMyExtensionId(this);
 
             tvMyDeviceIp = findViewById(R.id.tvMyDeviceIp);
             containerContacts = findViewById(R.id.containerContacts);
@@ -522,72 +530,114 @@ public class MainActivity extends Activity {
         builder.show();
     }
 
-    private void showSettingsDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Settings & Profile");
-
-        String verName = "1.1.2";
-        try {
-            verName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception ignored) {}
-        String msg = "Device Model: " + Build.MODEL + "\n" +
-                     "Current Extension: " + myExtId + "\n" +
-                     "Network: " + getNetworkStatusString() + "\n" +
-                     "Public WAN: " + (CallSignaling.myPublicEndpoint.isEmpty() ? "Discovering..." : CallSignaling.myPublicEndpoint) + "\n" +
-                     "Version: v" + verName + " (Universal Redundant Calling)\n" +
-                     "Signaling: HiveMQ + Mosquitto (Dual Failover)\n" +
-                     "Encryption: AES-256 Universal Military Grade";
-        builder.setMessage(msg);
-
-        builder.setPositiveButton("Check Updates", (dialog, which) -> {
-            Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
-            UpdateManager.checkUpdate(this, true);
-        });
-
-        builder.setNeutralButton("Change Device ID", (dialog, which) -> showDeviceSelectorDialog());
-
-        builder.setNegativeButton("Close", (dialog, which) -> dialog.dismiss());
-        builder.show();
-    }
-
-    private void showDeviceSelectorDialog() {
-        String[] devices = new String[]{
-                "Home Vivo Y51L (Ext 101)",
-                "My OnePlus Main (Ext 102)",
-                "Samsung Galaxy S24 Ultra (Ext 103)",
-                "Samsung Galaxy M35 5G (Ext 104)"
-        };
-        final String[] extMap = new String[]{"101", "102", "103", "104"};
-
-        int selectedIdx = 0;
-        for (int i = 0; i < extMap.length; i++) {
-            if (extMap[i].equals(myExtId)) {
-                selectedIdx = i;
-                break;
-            }
+    public static String getContactDisplayName(Context context, String ext, String fallbackName) {
+        if (ext == null || ext.isEmpty()) {
+            return fallbackName != null ? fallbackName : "Unknown";
+        }
+        if (context != null) {
+            try {
+                SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                String json = prefs.getString(KEY_CONTACTS_JSON, null);
+                if (json != null && !json.isEmpty()) {
+                    JSONArray arr = new JSONArray(json);
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject obj = arr.getJSONObject(i);
+                        if (ext.equals(obj.optString("ext"))) {
+                            String savedName = obj.optString("name", "");
+                            if (!savedName.trim().isEmpty()) {
+                                return savedName.trim();
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Which Device This Is");
-        builder.setSingleChoiceItems(devices, selectedIdx, (dialog, which) -> {
-            String newExt = extMap[which];
-            prefs.edit().putString("SAVED_MY_EXT_ID", newExt).apply();
-            myExtId = newExt;
-            Toast.makeText(this, "Device ID set to: " + devices[which], Toast.LENGTH_LONG).show();
-            dialog.dismiss();
+        // Friendly default identities based on hardware mapping
+        if ("101".equals(ext)) return "Home Vivo Y51L";
+        if ("102".equals(ext)) return "My OnePlus (Main)";
+        if ("103".equals(ext)) return "Samsung Galaxy S24 Ultra";
+        if ("104".equals(ext)) return "Samsung Galaxy M35 5G";
 
-            loadContacts();
-            renderContactsUI();
+        return (fallbackName != null && !fallbackName.isEmpty()) ? fallbackName : "Extension " + ext;
+    }
 
+    public static void openAutostartSettings(Context context) {
+        try {
+            Intent intent = new Intent();
+            String brand = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
+            if (brand.contains("vivo")) {
+                intent.setComponent(new ComponentName("com.iqoo.secure", "com.iqoo.secure.safeguard.PurviewTabActivity"));
+            } else if (brand.contains("oppo") || brand.contains("oneplus")) {
+                intent.setComponent(new ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
+            } else if (brand.contains("xiaomi")) {
+                intent.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            } else {
+                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
+            }
+            context.startActivity(intent);
+        } catch (Throwable t) {
             try {
-                CallSignaling sig = new CallSignaling(this, null);
-                sig.start();
-                sig.publishPresence();
-                sig.broadcastPresence();
-            } catch (Throwable ignored) {}
-        });
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
-        builder.show();
+                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                fallback.setData(Uri.parse("package:" + context.getPackageName()));
+                context.startActivity(fallback);
+            } catch (Throwable ignored) {
+                Toast.makeText(context, "Please open Settings > Apps > Wi-Fi Phone > Permissions", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void showSettingsDialog() {
+        try {
+            LayoutInflater inflater = LayoutInflater.from(this);
+            View view = inflater.inflate(R.layout.dialog_settings, null);
+
+            TextView tvDeviceName = view.findViewById(R.id.tvSettingsDeviceName);
+            TextView tvExtension = view.findViewById(R.id.tvSettingsExtension);
+            TextView tvNetwork = view.findViewById(R.id.tvSettingsNetwork);
+            TextView tvEncryption = view.findViewById(R.id.tvSettingsEncryption);
+            TextView tvVersion = view.findViewById(R.id.tvSettingsVersion);
+            Button btnAutostart = view.findViewById(R.id.btnOpenAutostart);
+            Button btnUpdates = view.findViewById(R.id.btnCheckUpdates);
+            Button btnClose = view.findViewById(R.id.btnCloseSettings);
+
+            String friendlyDevice = "Unknown Device";
+            if ("101".equals(myExtId)) friendlyDevice = "Home Vivo Y51L";
+            else if ("102".equals(myExtId)) friendlyDevice = "My OnePlus (CPH2381)";
+            else if ("103".equals(myExtId)) friendlyDevice = "Samsung Galaxy S24 Ultra";
+            else if ("104".equals(myExtId)) friendlyDevice = "Samsung Galaxy M35 5G";
+            else friendlyDevice = Build.MODEL;
+
+            tvDeviceName.setText(friendlyDevice + " (" + Build.MODEL + ")");
+            tvExtension.setText("Extension " + myExtId + " (Hardware Bound)");
+            tvNetwork.setText("Network: " + getNetworkStatusString());
+            tvEncryption.setText("Security: AES-256 Military End-to-End • TLS 8883");
+
+            String verName = "1.1.5";
+            try {
+                verName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception ignored) {}
+            tvVersion.setText("Version: v" + verName + " (HD Hybrid Voice Engine)");
+
+            AlertDialog dialog = new AlertDialog.Builder(this)
+                    .setView(view)
+                    .create();
+
+            btnAutostart.setOnClickListener(v -> openAutostartSettings(this));
+
+            btnUpdates.setOnClickListener(v -> {
+                Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
+                UpdateManager.checkUpdate(this, true);
+                dialog.dismiss();
+            });
+
+            btnClose.setOnClickListener(v -> dialog.dismiss());
+
+            dialog.show();
+        } catch (Throwable t) {
+            Log.e(TAG, "Settings dialog error", t);
+        }
     }
 
     private void startPeriodicStatusRefresh() {

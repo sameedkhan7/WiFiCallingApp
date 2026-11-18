@@ -59,6 +59,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         instance = this;
         try {
             startForegroundServiceNotification();
+            acquireLocks();
 
             signaling = new CallSignaling(this, this);
             signaling.start();
@@ -87,8 +88,26 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     }
 
     private void acquireLocks() {
-        // Battery Optimization: Idle CPU/Wi-Fi locks removed.
-        // Temporary wakelocks are only acquired on active incoming calls.
+        try {
+            String info = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
+            boolean isVivoOrOldAndroid = info.contains("vivo") || Build.VERSION.SDK_INT <= Build.VERSION_CODES.O;
+            if (isVivoOrOldAndroid) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
+                    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:KeepAliveLock");
+                    wakeLock.acquire();
+                }
+
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
+                    wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "WiFiCalling:WifiLock");
+                    wifiLock.acquire();
+                }
+                Log.i(TAG, "Acquired persistent locks for Vivo / legacy background stability");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Error acquiring locks", t);
+        }
     }
 
     private void startForegroundServiceNotification() {
@@ -166,7 +185,8 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
     @Override
     public void onIncomingCall(String callerName, String callerIp, String callerExt) {
-        Log.i(TAG, "Incoming call from " + callerName + " (Ext: " + callerExt + ", IP: " + callerIp + ")");
+        String resolvedName = MainActivity.getContactDisplayName(this, callerExt, callerName);
+        Log.i(TAG, "Incoming call from " + resolvedName + " [" + callerName + "] (Ext: " + callerExt + ", IP: " + callerIp + ")");
 
         // 1. Record recents interaction & Send RINGING response back to caller immediately
         MainActivity.recordInteraction(this, callerExt);
@@ -192,7 +212,8 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         // 4. Launch FullScreen Intent & Activity
         try {
             Intent callIntent = new Intent(this, IncomingCallActivity.class);
-            callIntent.putExtra("CALLER_NAME", callerName);
+            callIntent.putExtra("CALLER_NAME", resolvedName);
+            callIntent.putExtra("CALLER_MODEL", callerName);
             callIntent.putExtra("CALLER_IP", callerIp);
             callIntent.putExtra("CALLER_EXT", callerExt);
             callIntent.putExtra("CALLER_PUBLIC_EP", CallSignaling.getPeerPublicEndpoint(callerExt));
@@ -205,8 +226,8 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
             NotificationCompat.Builder notifBuilder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.sym_action_call)
-                    .setContentTitle("Incoming Wi-Fi Call")
-                    .setContentText(callerName + " is calling...")
+                    .setContentTitle(resolvedName)
+                    .setContentText(callerName + " (Ext " + callerExt + ") is calling...")
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -289,6 +310,30 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        Log.i(TAG, "App swiped from recents -> Scheduling immediate service resurrection");
+        try {
+            Intent restartIntent = new Intent(getApplicationContext(), CallBackgroundService.class);
+            restartIntent.setPackage(getPackageName());
+            PendingIntent restartPendingIntent = PendingIntent.getService(
+                    getApplicationContext(), 101, restartIntent,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_ONE_SHOT
+            );
+            android.app.AlarmManager alarmManager = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null) {
+                alarmManager.set(
+                        android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        android.os.SystemClock.elapsedRealtime() + 800,
+                        restartPendingIntent
+                );
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error in onTaskRemoved", t);
+        }
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         stopIncomingRingtone();
@@ -302,6 +347,16 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         } catch (Throwable ignored) {}
         instance = null;
+
+        // Auto-restart if killed unexpectedly by aggressive task cleaners
+        try {
+            Intent restartIntent = new Intent(getApplicationContext(), CallBackgroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(restartIntent);
+            } else {
+                startService(restartIntent);
+            }
+        } catch (Throwable ignored) {}
     }
 
     @Override

@@ -60,8 +60,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
         }
         isOutgoing = getIntent().getBooleanExtra("IS_OUTGOING", true);
 
+        String displayName = MainActivity.getContactDisplayName(this, remoteExt, remoteName);
+
         TextView tvName = findViewById(R.id.tvInCallName);
-        tvName.setText(remoteName != null ? remoteName : "Wi-Fi Call");
+        tvName.setText(displayName);
 
         tvStatus = findViewById(R.id.tvInCallStatus);
         chronometer = findViewById(R.id.callChronometer);
