@@ -53,6 +53,14 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         }
     }
 
+    public static CallBackgroundService getInstance() {
+        return instance;
+    }
+
+    public CallSignaling getSignaling() {
+        return signaling;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

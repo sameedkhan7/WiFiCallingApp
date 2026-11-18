@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 /**
  * Google Dialer Speed-Dial & Contact Management Screen.
@@ -162,13 +163,19 @@ public class MainActivity extends Activity {
             tvMyDeviceIp.setText(getNetworkStatusString());
         }
 
-        // Announce presence immediately on app resume and ensure signaling is started
-        try {
-            CallSignaling sig = new CallSignaling(this, null);
-            sig.start();
-            sig.broadcastPresence();
-            sig.publishPresence();
-        } catch (Throwable ignored) {}
+        // Announce presence immediately on app resume via background thread
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                if (CallBackgroundService.getInstance() != null && CallBackgroundService.getInstance().getSignaling() != null) {
+                    CallBackgroundService.getInstance().getSignaling().publishPresence();
+                    CallBackgroundService.getInstance().getSignaling().broadcastPresence();
+                } else {
+                    CallSignaling sig = new CallSignaling(getApplicationContext(), null);
+                    sig.publishPresence();
+                    sig.broadcastPresence();
+                }
+            } catch (Throwable ignored) {}
+        });
 
         mainHandler.removeCallbacks(refreshRunnable);
         mainHandler.postDelayed(refreshRunnable, 4000);
@@ -190,13 +197,15 @@ public class MainActivity extends Activity {
     }
 
     private void checkPromptUsernameRegistration() {
-        boolean hasRegistered = prefs.getBoolean("HAS_SET_USERNAME_V4", false);
+        boolean hasRegistered = prefs.getBoolean("HAS_SET_USERNAME_V5", false);
         if (!hasRegistered) {
             showMandatoryUsernameSetupDialog();
         }
     }
 
     private void showMandatoryUsernameSetupDialog() {
+        if (isFinishing()) return;
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Choose Your Calling Profile");
         builder.setCancelable(false);
@@ -213,71 +222,82 @@ public class MainActivity extends Activity {
 
         final EditText etName = new EditText(this);
         etName.setHint("Your Name (e.g. Sameed, Ammi, Faiza)");
-        etName.setText(getMyProfileName(this));
+        final String currentName = getMyProfileName(this);
+        etName.setText(currentName);
         layout.addView(etName);
 
         final EditText etUser = new EditText(this);
         etUser.setHint("Unique Username (e.g. sameed, ammi, faiza)");
         String legacy = CallSignaling.detectLegacyHardwareExt();
-        String defaultUser = legacy.equals("101") ? "ammi" :
-                             legacy.equals("102") ? "sameed" :
-                             legacy.equals("104") ? "faiza" :
-                             legacy.equals("103") ? "s24_ultra" : myExtId;
+        final String defaultUser = legacy.equals("101") ? "ammi" :
+                                   legacy.equals("102") ? "sameed" :
+                                   legacy.equals("104") ? "faiza" :
+                                   legacy.equals("103") ? "s24_ultra" : myExtId;
         etUser.setText(defaultUser);
         layout.addView(etUser);
 
         builder.setView(layout);
-        builder.setPositiveButton("Save & Start Calling", null);
+        builder.setPositiveButton("Save & Start Calling", (dialog, which) -> {
+            String name = etName.getText().toString().trim();
+            String username = etUser.getText().toString().trim().toLowerCase().replaceAll("[^a-z0-9_]", "");
+            if (name.isEmpty()) name = currentName;
+            if (username.isEmpty()) username = defaultUser;
+
+            applyProfileChange(name, username);
+            dialog.dismiss();
+            Toast.makeText(this, "Profile saved! @" + username, Toast.LENGTH_SHORT).show();
+        });
 
         AlertDialog dialog = builder.create();
         dialog.setCanceledOnTouchOutside(false);
         dialog.show();
+    }
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String name = etName.getText().toString().trim();
-            String username = etUser.getText().toString().trim().toLowerCase().replaceAll("[^a-z0-9_]", "");
-            if (name.isEmpty()) {
-                Toast.makeText(this, "Please enter your Name", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (username.isEmpty()) {
-                Toast.makeText(this, "Please enter a valid Username", Toast.LENGTH_SHORT).show();
-                return;
-            }
+    private void applyProfileChange(String name, String username) {
+        prefs.edit()
+                .putString("MY_PROFILE_NAME", name)
+                .putString("MY_USERNAME", username)
+                .putString("SAVED_MY_EXT_ID", username)
+                .putBoolean("HAS_SET_USERNAME_V5", true)
+                .apply();
 
-            prefs.edit()
-                    .putString("MY_PROFILE_NAME", name)
-                    .putString("MY_USERNAME", username)
-                    .putString("SAVED_MY_EXT_ID", username)
-                    .putBoolean("HAS_SET_USERNAME_V4", true)
-                    .apply();
+        getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit()
+                .putString("SAVED_MY_EXT_ID", username)
+                .apply();
 
-            getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit()
-                    .putString("SAVED_MY_EXT_ID", username)
-                    .apply();
+        myExtId = username;
 
-            myExtId = username;
+        cleanSelfFromContacts();
+        saveContacts();
+        renderContactsUI();
 
-            cleanSelfFromContacts();
-            saveContacts();
-            renderContactsUI();
-
-            // Re-announce presence with updated profile name
+        // Offload network signaling & presence broadcast completely to background thread
+        Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                CallSignaling sig = new CallSignaling(this, null);
-                sig.start();
-                sig.publishPresence();
-                sig.broadcastPresence();
+                if (CallBackgroundService.getInstance() != null) {
+                    CallBackgroundService s = CallBackgroundService.getInstance();
+                    if (s.getSignaling() != null) {
+                        s.getSignaling().updateMyExtId(username);
+                        s.getSignaling().reconnect();
+                        s.getSignaling().publishPresence();
+                        s.getSignaling().broadcastPresence();
+                    }
+                } else {
+                    CallSignaling sig = new CallSignaling(getApplicationContext(), null);
+                    sig.updateMyExtId(username);
+                    sig.publishPresence();
+                    sig.broadcastPresence();
+                }
             } catch (Throwable ignored) {}
-
-            dialog.dismiss();
-            Toast.makeText(this, "Username @" + username + " registered!", Toast.LENGTH_LONG).show();
         });
     }
 
     private void cleanSelfFromContacts() {
         String legacy = CallSignaling.detectLegacyHardwareExt();
         String myName = getMyProfileName(this).toLowerCase().trim();
+        String alias = CallSignaling.resolveExtAlias(myExtId);
+        if (alias == null) alias = "";
+
         Iterator<ContactItem> it = contactList.iterator();
         while (it.hasNext()) {
             ContactItem c = it.next();
@@ -285,7 +305,7 @@ public class MainActivity extends Activity {
             String cName = c.name.toLowerCase().trim();
             if (cExt.equals(myExtId.toLowerCase().trim()) || 
                 cExt.equals(legacy) || 
-                cExt.equals(CallSignaling.resolveExtAlias(myExtId)) ||
+                (!alias.isEmpty() && cExt.equals(alias.toLowerCase().trim())) ||
                 cName.equals(myName) ||
                 (cName.contains("oneplus") && (legacy.equals("102") || myExtId.contains("sameed") || myExtId.equals("102"))) ||
                 (cName.contains("vivo") && (legacy.equals("101") || myExtId.contains("ammi") || myExtId.equals("101"))) ||
@@ -499,11 +519,17 @@ public class MainActivity extends Activity {
         String myName = getMyProfileName(this).toLowerCase().trim();
         String cExt = contact.ext.toLowerCase().trim();
         String cName = contact.name.toLowerCase().trim();
+        String alias = CallSignaling.resolveExtAlias(myExtId);
+        if (alias == null) alias = "";
 
         if (cExt.equals(myExtId.toLowerCase().trim()) || 
             cExt.equals(legacy) || 
-            cExt.equals(CallSignaling.resolveExtAlias(myExtId)) ||
-            cName.equals(myName)) {
+            (!alias.isEmpty() && cExt.equals(alias.toLowerCase().trim())) ||
+            cName.equals(myName) ||
+            (cName.contains("oneplus") && (legacy.equals("102") || myExtId.contains("sameed") || myExtId.equals("102"))) ||
+            (cName.contains("vivo") && (legacy.equals("101") || myExtId.contains("ammi") || myExtId.equals("101"))) ||
+            (cName.contains("m35") && (legacy.equals("104") || myExtId.contains("faiza") || myExtId.equals("104"))) ||
+            (cName.contains("s24") && (legacy.equals("103") || myExtId.contains("s24") || myExtId.equals("103")))) {
             Toast.makeText(this, "Cannot call your own device!", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -669,27 +695,13 @@ public class MainActivity extends Activity {
 
         builder.setPositiveButton("Save", (dialog, which) -> {
             String newName = etName.getText().toString().trim();
-            String newExt = etExt.getText().toString().trim();
-            if (!newName.isEmpty()) {
-                prefs.edit().putString("MY_PROFILE_NAME", newName).apply();
-            }
-            if (!newExt.isEmpty()) {
-                myExtId = newExt;
-                prefs.edit().putString("SAVED_MY_EXT_ID", newExt).apply();
-                getSharedPreferences("WiFiCallingPrefs", MODE_PRIVATE).edit().putString("SAVED_MY_EXT_ID", newExt).apply();
-            }
-            loadContacts();
-            renderContactsUI();
+            String newExt = etExt.getText().toString().trim().toLowerCase().replaceAll("[^a-z0-9_]", "");
+            if (newName.isEmpty()) newName = getMyProfileName(this);
+            if (newExt.isEmpty()) newExt = myExtId;
 
-            // Broadcast presence immediately with updated profile name
-            try {
-                CallSignaling sig = new CallSignaling(this, null);
-                sig.start();
-                sig.publishPresence();
-                sig.broadcastPresence();
-            } catch (Throwable ignored) {}
-
-            Toast.makeText(this, "Profile updated! Name: " + newName + " | ID: " + myExtId, Toast.LENGTH_SHORT).show();
+            applyProfileChange(newName, newExt);
+            dialog.dismiss();
+            Toast.makeText(this, "Profile updated! Name: " + newName + " | @" + myExtId, Toast.LENGTH_SHORT).show();
         });
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
         builder.show();

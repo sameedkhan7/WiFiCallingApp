@@ -1,6 +1,6 @@
 {
-  "versionCode": 24,
-  "versionName": "1.2.4",
+  "versionCode": 25,
+  "versionName": "1.2.5",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Onboarding Username Popup: Mandatory Name & Username setup dialog pops up right upon updating\n2. Self-Calling Bug Fixed: Your phone is permanently placed in 'This Device' at the bottom and never appears in contacts\n3. Pure Username Handles: Clean @username identities (e.g. @sameed, @ammi, @faiza) replace numerical IDs\n4. Dual Legacy Compatibility: Seamlessly connects with both @username and legacy numbers\n5. Multi-Device Compatibility: Vivo Y51L, OnePlus, Samsung S24 Ultra & M35"
+  "changelog": "1. Zero Freeze on Save: Eliminated UI blocking thread freeze when saving username or name\n2. Vivo Android 5.0 Dialog Fix: Native positive button works smoothly on all devices\n3. Dedicated Self Device Card: Always pinned at bottom with Active status & @username\n4. Zero Self-Dialing: Filtered out own phone from contact list and MQTT incoming presence\n5. Multi-Device Compatibility: Vivo Y51L, OnePlus, Samsung S24 Ultra & M35"
 }

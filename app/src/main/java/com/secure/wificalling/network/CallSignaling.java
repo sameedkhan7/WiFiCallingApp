@@ -124,6 +124,12 @@ public class CallSignaling {
         }
     }
 
+    public void updateMyExtId(String newExt) {
+        if (newExt != null && !newExt.trim().isEmpty()) {
+            this.myExtId = newExt.trim().toLowerCase();
+        }
+    }
+
     public static String detectLegacyHardwareExt() {
         String info = (Build.MODEL + " " + Build.BRAND + " " + Build.MANUFACTURER + " " + Build.DEVICE + " " + Build.PRODUCT).toLowerCase();
         if (info.contains("vivo") || info.contains("y51") || info.contains("pd1510") || info.contains("bbk") ||
@@ -483,7 +489,9 @@ public class CallSignaling {
             if (topic.startsWith(PRESENCE_PREFIX)) {
                 JSONObject json = new JSONObject(rawPayload);
                 String ext = json.optString("ext");
-                if (ext.equals(myExtId)) return;
+                String legacy = detectLegacyHardwareExt();
+                String alias = resolveExtAlias(myExtId);
+                if (ext.equals(myExtId) || ext.equals(legacy) || (alias != null && ext.equals(alias))) return;
 
                 long msgTime = json.optLong("time", 0);
                 long now = System.currentTimeMillis();
