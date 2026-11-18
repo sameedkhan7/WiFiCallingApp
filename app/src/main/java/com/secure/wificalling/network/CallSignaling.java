@@ -166,7 +166,7 @@ public class CallSignaling {
         if (ext == null) return false;
         PeerStatus ps = peerStatuses.get(ext);
         if (ps == null) return false;
-        if (System.currentTimeMillis() - ps.lastSeen > 20000) {
+        if (System.currentTimeMillis() - ps.lastSeen > 75000) {
             peerStatuses.remove(ext);
             return false;
         }
@@ -446,8 +446,8 @@ public class CallSignaling {
                     return;
                 }
 
-                // Discard stale retained messages or messages older than 20 seconds
-                if (msgTime > 0 && Math.abs(now - msgTime) > 20000) {
+                // Discard stale retained messages or messages older than 75 seconds
+                if (msgTime > 0 && Math.abs(now - msgTime) > 75000) {
                     peerStatuses.remove(ext);
                     return;
                 }
@@ -457,7 +457,11 @@ public class CallSignaling {
                 String publicEp = json.optString("publicEp", "");
                 String netType = json.optString("netType", "Online");
 
-                peerStatuses.put(ext, new PeerStatus(name, ext, localIp, publicEp, netType));
+                PeerStatus newStatus = new PeerStatus(name, ext, localIp, publicEp, netType);
+                if (msgTime > 0) {
+                    newStatus.lastSeen = msgTime;
+                }
+                peerStatuses.put(ext, newStatus);
                 if (!publicEp.isEmpty()) {
                     peerPublicEndpoints.put(ext, publicEp);
                 }
@@ -508,7 +512,7 @@ public class CallSignaling {
 
             MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
             msg.setQos(1);
-            msg.setRetained(false); // Dynamic presence: Never retain periodic heartbeats so inactive devices show offline
+            msg.setRetained(true); // Retained presence: Guaranteed instant peer discovery with timestamp validation
             mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
         } catch (Exception ignored) {}
     }
@@ -611,7 +615,13 @@ public class CallSignaling {
         threadPool.execute(() -> {
             ensureMqttConnected();
             String myIp = getLocalIpAddress();
-            String payload = command + "|" + Build.MODEL + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint + "|" + targetExt;
+            String mySenderName = Build.MODEL;
+            if (context != null) {
+                try {
+                    mySenderName = com.secure.wificalling.ui.MainActivity.getContactDisplayName(context, myExtId, Build.MODEL);
+                } catch (Throwable ignored) {}
+            }
+            String payload = command + "|" + mySenderName + "|" + myExtId + "|" + myIp + "|" + myPublicEndpoint + "|" + targetExt;
             String encrypted = CryptoUtil.encrypt(payload);
 
             // 1. Primary: Internet MQTT (Guaranteed QoS 1 delivery across Wi-Fi & 4G/5G)

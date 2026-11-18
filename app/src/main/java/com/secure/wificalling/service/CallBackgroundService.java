@@ -89,22 +89,18 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
     private void acquireLocks() {
         try {
-            String info = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
-            boolean isVivoOrOldAndroid = info.contains("vivo") || Build.VERSION.SDK_INT <= Build.VERSION_CODES.O;
-            if (isVivoOrOldAndroid) {
-                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
-                    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:KeepAliveLock");
-                    wakeLock.acquire();
-                }
-
-                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
-                    wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "WiFiCalling:WifiLock");
-                    wifiLock.acquire();
-                }
-                Log.i(TAG, "Acquired persistent locks for Vivo / legacy background stability");
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:KeepAliveLock");
+                wakeLock.acquire();
             }
+
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
+                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
+                wifiLock.acquire();
+            }
+            Log.i(TAG, "Acquired persistent locks for 24/7 background VoIP calling");
         } catch (Throwable t) {
             Log.w(TAG, "Error acquiring locks", t);
         }

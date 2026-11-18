@@ -520,21 +520,33 @@ public class MainActivity extends Activity {
     }
 
     public static String getContactDisplayName(Context context, String ext, String fallbackName) {
-        if (ext == null || ext.isEmpty()) {
-            return fallbackName != null ? fallbackName : "Unknown";
-        }
         if (context != null) {
             try {
                 SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                 String json = prefs.getString(KEY_CONTACTS_JSON, null);
                 if (json != null && !json.isEmpty()) {
                     JSONArray arr = new JSONArray(json);
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONObject obj = arr.getJSONObject(i);
-                        if (ext.equals(obj.optString("ext"))) {
-                            String savedName = obj.optString("name", "");
-                            if (!savedName.trim().isEmpty()) {
-                                return savedName.trim();
+                    // 1. Match by extension ID first (Primary guarantee)
+                    if (ext != null && !ext.isEmpty()) {
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject obj = arr.getJSONObject(i);
+                            if (ext.equals(obj.optString("ext"))) {
+                                String savedName = obj.optString("name", "");
+                                if (!savedName.trim().isEmpty()) {
+                                    return savedName.trim();
+                                }
+                            }
+                        }
+                    }
+                    // 2. Match by hardware model or query (e.g. "CPH2381" or "OnePlus" or "Vivo")
+                    if (fallbackName != null && !fallbackName.trim().isEmpty()) {
+                        String lowerFallback = fallbackName.toLowerCase();
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject obj = arr.getJSONObject(i);
+                            String q = obj.optString("query", "").toLowerCase();
+                            String n = obj.optString("name", "");
+                            if (!q.isEmpty() && (lowerFallback.contains(q) || q.contains(lowerFallback))) {
+                                if (!n.trim().isEmpty()) return n.trim();
                             }
                         }
                     }

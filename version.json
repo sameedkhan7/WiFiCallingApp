@@ -1,6 +1,6 @@
 ﻿{
-  "versionCode": 18,
-  "versionName": "1.1.8",
+  "versionCode": 19,
+  "versionName": "1.1.9",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Real-time Presence: Eliminated ghost online status for uninstalled/inactive devices (non-retained live heartbeats)\n2. Stale Cache Purge: Purged old retained presence on cloud brokers\n3. Google Play Protect: Fully compliant, clean permissions, verified TLS standards"
+  "changelog": "1. Cross-Network Audio: IMA-ADPCM 4:1 audio compression enables crystal-clear voice across 4G/5G mobile carriers and Wi-Fi\n2. Caller Name Priority: Saved contact names (e.g. Sameed) always display on incoming and in-call screens instead of hardware chip IDs\n3. Vivo 24/7 Background Persistence: Upgraded wake locks and 75s presence heartbeats keep Vivo always online even when screen is off\n4. Multi-Device: Full compatibility for Vivo Y51L (Android 5.0), OnePlus, Samsung Galaxy M35 & S24 Ultra"
 }
