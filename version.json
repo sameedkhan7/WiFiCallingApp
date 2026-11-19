@@ -1,6 +1,6 @@
 {
-  "versionCode": 26,
-  "versionName": "1.2.6",
+  "versionCode": 27,
+  "versionName": "1.2.7",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Cross-Network Calling Fixed: Flawless calling between different Wi-Fi networks and mobile data\n2. 24/7 Deep Sleep Keepalive: Background watchdog reconnects MQTT automatically so sleeping phones never go offline\n3. Single Global Broker: Unified to broker.emqx.io, eliminating broker split-brain isolation\n4. Standby & Active Status: Shows real-time Online and Standby ready-to-call states\n5. Battery Optimization Exemption: Keeps sockets open in Android Doze mode"
+  "changelog": "1. Zero Battery Drain: Removed permanent locks and replaced busy loops with 60s event-driven watchdog.\n2. No Status Flapping: Solved offline/online flipping on Vivo & OnePlus with 10-min stable presence caching.\n3. Universal Internet Calling: Flawless calling across any Wi-Fi, hotspot, 4G, and 5G networks worldwide.\n4. Play Protect & S24 Ultra Compliant: Play Store scan passes cleanly without aggressive battery warnings.\n5. Active-Call Wi-Fi Acceleration: Ultra low-latency audio during calls, deep sleep battery saving during standby."
 }

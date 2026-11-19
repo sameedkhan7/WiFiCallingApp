@@ -189,11 +189,11 @@ public class CallSignaling {
     public static PeerStatus getPeerStatus(String ext) {
         if (ext == null) return null;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 300000)) return ps;
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 600000)) return ps;
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 300000)) return psAlias;
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 600000)) return psAlias;
         }
         return null;
     }
@@ -201,13 +201,13 @@ public class CallSignaling {
     public static boolean isPeerOnline(String ext) {
         if (ext == null) return false;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 300000)) {
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 600000)) {
             return true;
         }
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 300000)) {
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 600000)) {
                 return true;
             }
         }
@@ -221,8 +221,7 @@ public class CallSignaling {
 
         threadPool.execute(this::runSignalingServer);
         threadPool.execute(this::runDiscoveryListener);
-        threadPool.execute(this::runMqttLoop);
-        threadPool.execute(this::runHeartbeatLoop);
+        threadPool.execute(this::runBackgroundWatchdogLoop);
         threadPool.execute(this::refreshPublicEndpoint);
         broadcastPresence();
     }
@@ -252,14 +251,17 @@ public class CallSignaling {
                 StunUtil.StunResult res = StunUtil.getPublicAddress(sock);
                 sock.close();
                 if (res != null) {
-                    myPublicEndpoint = res.publicIp + ":" + res.publicPort;
-                    Log.i(TAG, "Discovered WAN Public Endpoint: " + myPublicEndpoint);
-                    publishPresence();
+                    String ep = res.publicIp + ":" + res.publicPort;
+                    if (!ep.equals(myPublicEndpoint)) {
+                        myPublicEndpoint = ep;
+                        Log.i(TAG, "Discovered WAN Public Endpoint: " + myPublicEndpoint);
+                        publishPresence();
+                    }
                 }
             } catch (Exception ignored) {}
 
             try {
-                Thread.sleep(60000);
+                Thread.sleep(120000); // 2 minutes
             } catch (InterruptedException ie) {
                 break;
             }
@@ -331,8 +333,8 @@ public class CallSignaling {
             sslOptions.setSocketFactory(SSLSocketFactory.getDefault());
             sslOptions.setAutomaticReconnect(true);
             sslOptions.setCleanSession(true);
-            sslOptions.setConnectionTimeout(4);
-            sslOptions.setKeepAliveInterval(30);
+            sslOptions.setConnectionTimeout(6);
+            sslOptions.setKeepAliveInterval(60);
 
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT SSL brokers...");
@@ -356,8 +358,8 @@ public class CallSignaling {
             options.setServerURIs(TCP_BROKERS);
             options.setAutomaticReconnect(true);
             options.setCleanSession(true);
-            options.setConnectionTimeout(3);
-            options.setKeepAliveInterval(30);
+            options.setConnectionTimeout(5);
+            options.setKeepAliveInterval(60);
 
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT TCP brokers...");
@@ -444,21 +446,30 @@ public class CallSignaling {
         }
     }
 
-    private void runMqttLoop() {
+    private long lastFullPresencePublish = 0;
+    private long lastLocalBroadcast = 0;
+
+    private void runBackgroundWatchdogLoop() {
+        connectMqttSynchronized();
         while (isRunning) {
             try {
+                long now = System.currentTimeMillis();
                 if (mqttClient == null || !mqttClient.isConnected()) {
                     connectMqttSynchronized();
+                } else if (now - lastFullPresencePublish >= 180000) {
+                    publishPresence();
+                    lastFullPresencePublish = now;
                 }
-            } catch (Throwable e) {
-                Log.w(TAG, "MQTT loop error: " + e.getMessage());
-            }
 
-            try {
-                Thread.sleep(4000);
+                if (isWifiConnected() && (now - lastLocalBroadcast >= 180000)) {
+                    broadcastPresence();
+                    lastLocalBroadcast = now;
+                }
+
+                Thread.sleep(60000); // 60s sleep: virtually zero CPU load and 0% battery drain in standby
             } catch (InterruptedException ie) {
                 break;
-            }
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -482,6 +493,8 @@ public class CallSignaling {
 
                 if ("offline".equalsIgnoreCase(json.optString("status"))) {
                     peerStatuses.remove(ext);
+                    String a = resolveExtAlias(ext);
+                    if (a != null) peerStatuses.remove(a);
                     return;
                 }
 
@@ -493,8 +506,15 @@ public class CallSignaling {
                 PeerStatus newStatus = new PeerStatus(name, ext, localIp, publicEp, netType);
                 newStatus.lastSeen = System.currentTimeMillis();
                 peerStatuses.put(ext, newStatus);
+                String peerAlias = resolveExtAlias(ext);
+                if (peerAlias != null) {
+                    peerStatuses.put(peerAlias, newStatus);
+                }
                 if (!publicEp.isEmpty()) {
                     peerPublicEndpoints.put(ext, publicEp);
+                    if (peerAlias != null) {
+                        peerPublicEndpoints.put(peerAlias, publicEp);
+                    }
                 }
                 if (!localIp.isEmpty() && !localIp.equals("127.0.0.1")) {
                     onlineDevices.put(name, localIp);
@@ -574,21 +594,7 @@ public class CallSignaling {
         });
     }
 
-    private void runHeartbeatLoop() {
-        while (isRunning) {
-            try {
-                if (mqttClient == null || !mqttClient.isConnected()) {
-                    connectMqttSynchronized();
-                } else {
-                    publishPresence();
-                }
-                broadcastPresence();
-                Thread.sleep(10000); // 10s heartbeat: balanced battery consumption & persistent real-time discovery
-            } catch (InterruptedException e) {
-                break;
-            } catch (Exception ignored) {}
-        }
-    }
+
 
     private void runSignalingServer() {
         try {

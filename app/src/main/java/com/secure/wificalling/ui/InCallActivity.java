@@ -122,6 +122,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
 
         stopRingbackTone();
 
+        if (CallBackgroundService.getInstance() != null) {
+            CallBackgroundService.getInstance().acquireActiveCallWifiLock();
+        }
+
         mainHandler.post(() -> {
             tvStatus.setText("Connected • Encrypted");
             chronometer.setVisibility(View.VISIBLE);
@@ -139,6 +143,10 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
 
     private synchronized void endCall(boolean notifyRemote) {
         stopRingbackTone();
+
+        if (CallBackgroundService.getInstance() != null) {
+            CallBackgroundService.getInstance().releaseActiveCallWifiLock();
+        }
 
         if (voiceEngine != null) {
             voiceEngine.stopCall();
@@ -195,6 +203,9 @@ public class InCallActivity extends Activity implements CallSignaling.CallListen
     protected void onDestroy() {
         super.onDestroy();
         stopRingbackTone();
+        if (CallBackgroundService.getInstance() != null) {
+            CallBackgroundService.getInstance().releaseActiveCallWifiLock();
+        }
         if (voiceEngine != null) {
             voiceEngine.stopCall();
         }

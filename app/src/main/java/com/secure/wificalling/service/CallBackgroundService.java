@@ -100,25 +100,44 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     private static final String ACTION_KEEPALIVE = "com.secure.wificalling.ACTION_KEEPALIVE";
     private PendingIntent keepAlivePendingIntent;
 
-    private void acquireLocks() {
+    public void acquireTempWakeLock(long durationMs) {
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:KeepAliveLock");
-                wakeLock.setReferenceCounted(false);
-                wakeLock.acquire();
+            if (pm != null) {
+                PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiCalling:TempWakeLock");
+                wl.acquire(durationMs);
             }
+        } catch (Throwable ignored) {}
+    }
 
+    public synchronized void acquireActiveCallWifiLock() {
+        try {
             WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
-                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:WifiLock");
+                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WiFiCalling:ActiveCallWifiLock");
                 wifiLock.setReferenceCounted(false);
                 wifiLock.acquire();
+                Log.i(TAG, "High-performance Wi-Fi lock acquired for active call");
             }
-            Log.i(TAG, "Acquired persistent locks for 24/7 background VoIP calling");
-        } catch (Throwable t) {
-            Log.w(TAG, "Error acquiring locks", t);
-        }
+        } catch (Throwable ignored) {}
+    }
+
+    public synchronized void releaseActiveCallWifiLock() {
+        try {
+            if (wifiLock != null && wifiLock.isHeld()) {
+                wifiLock.release();
+                wifiLock = null;
+                Log.i(TAG, "High-performance Wi-Fi lock released after call ended");
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void acquireLocks() {
+        // Battery optimization:
+        // Do not hold permanent wakelock or permanent wifi-lock 24/7!
+        // Standby relies on native foreground service + lightweight MQTT TCP socket.
+        // Wakelocks are only acquired transiently on incoming call (15s) or keepalive check (3s).
+        // High-perf Wi-Fi lock is only acquired during active call stream.
     }
 
     private void scheduleKeepAliveAlarm() {
@@ -130,7 +149,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT;
                 keepAlivePendingIntent = PendingIntent.getService(this, 102, intent, flags);
 
-                long triggerAt = android.os.SystemClock.elapsedRealtime() + 20000;
+                long triggerAt = android.os.SystemClock.elapsedRealtime() + 75000;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     am.setExactAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, keepAlivePendingIntent);
                 } else {
@@ -144,6 +163,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        acquireTempWakeLock(3000);
         if (intent != null && ACTION_KEEPALIVE.equals(intent.getAction())) {
             if (signaling != null) {
                 signaling.ensureConnectedAndPublishPresence();

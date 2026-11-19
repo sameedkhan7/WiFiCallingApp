@@ -146,7 +146,7 @@ public class MainActivity extends Activity {
                 requestAllPermissions();
             }
 
-            checkBatteryOptimization();
+            // Battery optimization is placed in Settings for user-initiated opt-in (Play Protect compliant)
             startPeriodicStatusRefresh();
             UpdateManager.checkUpdate(this, false);
         } catch (Throwable t) {
@@ -457,7 +457,7 @@ public class MainActivity extends Activity {
                 CallSignaling.PeerStatus ps = CallSignaling.getPeerStatus(contact.ext);
                 String netType = (ps != null && ps.networkType != null) ? ps.networkType : "Online";
                 long age = (ps != null) ? (System.currentTimeMillis() - ps.lastSeen) : 0;
-                if (age < 90000) {
+                if (age < 180000) {
                     tvStatus.setText("🟢 Online (" + netType + ") • @" + contact.ext);
                 } else {
                     tvStatus.setText("🟢 Standby (" + netType + ") • @" + contact.ext);
@@ -805,7 +805,10 @@ public class MainActivity extends Activity {
                     .setView(view)
                     .create();
 
-            btnAutostart.setOnClickListener(v -> openAutostartSettings(this));
+            btnAutostart.setOnClickListener(v -> {
+                checkBatteryOptimization();
+                openAutostartSettings(this);
+            });
 
             btnUpdates.setOnClickListener(v -> {
                 Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
