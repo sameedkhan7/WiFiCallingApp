@@ -146,6 +146,7 @@ public class MainActivity extends Activity {
                 requestAllPermissions();
             }
 
+            checkBatteryOptimization();
             startPeriodicStatusRefresh();
             UpdateManager.checkUpdate(this, false);
         } catch (Throwable t) {
@@ -455,7 +456,12 @@ public class MainActivity extends Activity {
             if (isOnline) {
                 CallSignaling.PeerStatus ps = CallSignaling.getPeerStatus(contact.ext);
                 String netType = (ps != null && ps.networkType != null) ? ps.networkType : "Online";
-                tvStatus.setText("🟢 Online (" + netType + ") • @" + contact.ext);
+                long age = (ps != null) ? (System.currentTimeMillis() - ps.lastSeen) : 0;
+                if (age < 90000) {
+                    tvStatus.setText("🟢 Online (" + netType + ") • @" + contact.ext);
+                } else {
+                    tvStatus.setText("🟢 Standby (" + netType + ") • @" + contact.ext);
+                }
                 tvStatus.setTextColor(Color.parseColor("#34A853"));
             } else {
                 tvStatus.setText("⚪ Offline / Standby • @" + contact.ext);
@@ -817,6 +823,20 @@ public class MainActivity extends Activity {
 
     private void startPeriodicStatusRefresh() {
         // Handled dynamically in onResume and onPause to save battery
+    }
+
+    private void checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                }
+            } catch (Throwable ignored) {}
+        }
     }
 
     private boolean hasAllPermissions() {

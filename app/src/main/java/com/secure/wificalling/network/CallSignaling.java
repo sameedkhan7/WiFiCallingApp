@@ -54,13 +54,11 @@ public class CallSignaling {
     public static final int AUDIO_PORT = 50622;
 
     private static final String[] TCP_BROKERS = {
-        "tcp://broker.emqx.io:1883",
-        "tcp://test.mosquitto.org:1883"
+        "tcp://broker.emqx.io:1883"
     };
 
     private static final String[] SSL_BROKERS = {
-        "ssl://broker.emqx.io:8883",
-        "ssl://test.mosquitto.org:8883"
+        "ssl://broker.emqx.io:8883"
     };
 
     private static final String TOPIC_PREFIX = "wificall_sk_v6/call/";
@@ -191,11 +189,11 @@ public class CallSignaling {
     public static PeerStatus getPeerStatus(String ext) {
         if (ext == null) return null;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 75000)) return ps;
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 300000)) return ps;
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 75000)) return psAlias;
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 300000)) return psAlias;
         }
         return null;
     }
@@ -203,13 +201,13 @@ public class CallSignaling {
     public static boolean isPeerOnline(String ext) {
         if (ext == null) return false;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 75000)) {
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 300000)) {
             return true;
         }
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 75000)) {
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 300000)) {
                 return true;
             }
         }
@@ -334,14 +332,7 @@ public class CallSignaling {
             sslOptions.setAutomaticReconnect(true);
             sslOptions.setCleanSession(true);
             sslOptions.setConnectionTimeout(4);
-            sslOptions.setKeepAliveInterval(25);
-
-            JSONObject offlineObj = new JSONObject();
-            offlineObj.put("ext", myExtId);
-            offlineObj.put("status", "offline");
-            offlineObj.put("time", System.currentTimeMillis());
-            // retained = false: Temporary disconnects must NOT permanently mark device offline!
-            sslOptions.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, false);
+            sslOptions.setKeepAliveInterval(30);
 
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT SSL brokers...");
@@ -366,14 +357,7 @@ public class CallSignaling {
             options.setAutomaticReconnect(true);
             options.setCleanSession(true);
             options.setConnectionTimeout(3);
-            options.setKeepAliveInterval(25);
-
-            JSONObject offlineObj = new JSONObject();
-            offlineObj.put("ext", myExtId);
-            offlineObj.put("status", "offline");
-            offlineObj.put("time", System.currentTimeMillis());
-            // retained = false
-            options.setWill(PRESENCE_PREFIX + myExtId, offlineObj.toString().getBytes(StandardCharsets.UTF_8), 1, false);
+            options.setKeepAliveInterval(30);
 
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT TCP brokers...");
@@ -575,12 +559,31 @@ public class CallSignaling {
         } catch (Exception ignored) {}
     }
 
+    public void ensureConnectedAndPublishPresence() {
+        threadPool.execute(() -> {
+            try {
+                if (mqttClient == null || !mqttClient.isConnected()) {
+                    Log.i(TAG, "Watchdog Keepalive: MQTT disconnected -> Reconnecting immediately...");
+                    connectMqttSynchronized();
+                } else {
+                    publishPresence();
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "ensureConnectedAndPublishPresence error: " + t.getMessage());
+            }
+        });
+    }
+
     private void runHeartbeatLoop() {
         while (isRunning) {
             try {
-                publishPresence();
+                if (mqttClient == null || !mqttClient.isConnected()) {
+                    connectMqttSynchronized();
+                } else {
+                    publishPresence();
+                }
                 broadcastPresence();
-                Thread.sleep(6000); // 6s heartbeat for active real-time discovery
+                Thread.sleep(10000); // 10s heartbeat: balanced battery consumption & persistent real-time discovery
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {}

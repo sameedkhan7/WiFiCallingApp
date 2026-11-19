@@ -84,13 +84,15 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     if (signaling != null) {
-                        Log.i(TAG, "Network state changed -> triggering reconnect & presence publish");
-                        signaling.reconnect();
-                        signaling.publishPresence();
+                        Log.i(TAG, "Network / Screen state changed -> triggering keepalive & presence publish");
+                        signaling.ensureConnectedAndPublishPresence();
                     }
                 }
             };
-            IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            filter.addAction(Intent.ACTION_USER_PRESENT);
             registerReceiver(networkReceiver, filter);
         } catch (Throwable ignored) {}
     }
@@ -128,7 +130,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
                 int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT;
                 keepAlivePendingIntent = PendingIntent.getService(this, 102, intent, flags);
 
-                long triggerAt = android.os.SystemClock.elapsedRealtime() + 25000;
+                long triggerAt = android.os.SystemClock.elapsedRealtime() + 20000;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     am.setExactAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, keepAlivePendingIntent);
                 } else {
@@ -144,7 +146,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_KEEPALIVE.equals(intent.getAction())) {
             if (signaling != null) {
-                signaling.publishPresence();
+                signaling.ensureConnectedAndPublishPresence();
             }
             scheduleKeepAliveAlarm();
             return START_STICKY;
