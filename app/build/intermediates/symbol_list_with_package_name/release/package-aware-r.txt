@@ -636,6 +636,7 @@ drawable ic_call_answer_video
 drawable ic_call_answer_video_low
 drawable ic_call_decline
 drawable ic_call_decline_low
+drawable ic_launcher
 drawable notification_action_background
 drawable notification_bg
 drawable notification_bg_low
@@ -718,8 +719,11 @@ id beginning
 id blocking
 id bottom
 id btnAnswer
+id btnCheckUpdates
+id btnCloseSettings
 id btnHangup
 id btnMute
+id btnOpenAutostart
 id btnReject
 id btnSpeaker
 id btnTopAddContact
@@ -833,6 +837,11 @@ id tvCallerName
 id tvInCallName
 id tvInCallStatus
 id tvMyDeviceIp
+id tvSettingsDeviceName
+id tvSettingsEncryption
+id tvSettingsExtension
+id tvSettingsNetwork
+id tvSettingsVersion
 id unchecked
 id uniform
 id up
@@ -888,6 +897,7 @@ layout activity_in_call
 layout activity_incoming_call
 layout activity_main
 layout custom_dialog
+layout dialog_settings
 layout ime_base_split_test_activity
 layout ime_secondary_split_test_activity
 layout notification_action

@@ -9,7 +9,7 @@
     <color name="surface_dark">#1E1E1E</color>
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#B0B0B0</color>
-    <string name="app_name">Wi-Fi Phone</string>
+    <string name="app_name">Internet Call</string>
     <style name="Theme.WiFiCalling" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@color/background_dark</item>
         <item name="android:textColor">@color/text_primary</item>

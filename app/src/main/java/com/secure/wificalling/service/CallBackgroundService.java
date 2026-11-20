@@ -388,6 +388,9 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
         super.onDestroy();
         stopIncomingRingtone();
         try {
+            if (signaling != null) {
+                signaling.publishOfflinePresence();
+            }
             if (networkReceiver != null) {
                 try { unregisterReceiver(networkReceiver); } catch (Throwable ignored) {}
                 networkReceiver = null;

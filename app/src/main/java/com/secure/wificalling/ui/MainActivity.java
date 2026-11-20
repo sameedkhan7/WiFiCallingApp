@@ -164,6 +164,13 @@ public class MainActivity extends Activity {
             tvMyDeviceIp.setText(getNetworkStatusString());
         }
 
+        CallSignaling.setPresenceListener((ext, isOnline, netType) -> runOnUiThread(() -> {
+            renderContactsUI();
+            if (tvMyDeviceIp != null) {
+                tvMyDeviceIp.setText(getNetworkStatusString());
+            }
+        }));
+
         // Announce presence immediately on app resume via background thread
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -179,13 +186,14 @@ public class MainActivity extends Activity {
         });
 
         mainHandler.removeCallbacks(refreshRunnable);
-        mainHandler.postDelayed(refreshRunnable, 4000);
+        mainHandler.postDelayed(refreshRunnable, 2000);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         isActivityResumed = false;
+        CallSignaling.setPresenceListener(null);
         mainHandler.removeCallbacks(refreshRunnable);
     }
 
@@ -546,7 +554,9 @@ public class MainActivity extends Activity {
         String lanIp = resolveLanIp(contact);
         Toast.makeText(this, "Calling " + contact.name + "...", Toast.LENGTH_SHORT).show();
 
-        CallSignaling signaling = new CallSignaling(this, null);
+        CallSignaling signaling = (CallBackgroundService.getInstance() != null && CallBackgroundService.getInstance().getSignaling() != null)
+                ? CallBackgroundService.getInstance().getSignaling()
+                : new CallSignaling(this, null);
         signaling.sendCommand(contact.ext, lanIp, "INVITE");
 
         Intent intent = new Intent(this, InCallActivity.class);

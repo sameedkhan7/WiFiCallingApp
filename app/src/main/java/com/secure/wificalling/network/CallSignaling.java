@@ -73,6 +73,16 @@ public class CallSignaling {
         void onCallEnded(String remoteIp);
     }
 
+    public interface PresenceListener {
+        void onPresenceChanged(String ext, boolean isOnline, String netType);
+    }
+
+    private static volatile PresenceListener activePresenceListener;
+
+    public static void setPresenceListener(PresenceListener listener) {
+        activePresenceListener = listener;
+    }
+
     public static class PeerStatus {
         public String name;
         public String ext;
@@ -512,6 +522,9 @@ public class CallSignaling {
                     peerStatuses.remove(ext);
                     String a = resolveExtAlias(ext);
                     if (a != null) peerStatuses.remove(a);
+                    if (activePresenceListener != null) {
+                        activePresenceListener.onPresenceChanged(ext, false, "Offline");
+                    }
                     return;
                 }
 
@@ -526,6 +539,9 @@ public class CallSignaling {
                 String peerAlias = resolveExtAlias(ext);
                 if (peerAlias != null) {
                     peerStatuses.put(peerAlias, newStatus);
+                }
+                if (activePresenceListener != null) {
+                    activePresenceListener.onPresenceChanged(ext, true, netType);
                 }
                 if (!publicEp.isEmpty()) {
                     peerPublicEndpoints.put(ext, publicEp);
@@ -593,6 +609,31 @@ public class CallSignaling {
             obj.put("publicEp", myPublicEndpoint);
             obj.put("netType", isWifiConnected() ? "Wi-Fi" : "Mobile Data");
             obj.put("status", "online");
+            obj.put("time", System.currentTimeMillis());
+
+            MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
+            msg.setQos(1);
+            msg.setRetained(true);
+            mqttClient.publish(PRESENCE_PREFIX + myExtId, msg);
+
+            String legacy = detectLegacyHardwareExt();
+            if (!legacy.equals(myExtId)) {
+                JSONObject legacyObj = new JSONObject(obj.toString());
+                legacyObj.put("ext", legacy);
+                MqttMessage legacyMsg = new MqttMessage(legacyObj.toString().getBytes(StandardCharsets.UTF_8));
+                legacyMsg.setQos(1);
+                legacyMsg.setRetained(true);
+                mqttClient.publish(PRESENCE_PREFIX + legacy, legacyMsg);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void publishOfflinePresence() {
+        if (mqttClient == null || !mqttClient.isConnected()) return;
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("ext", myExtId);
+            obj.put("status", "offline");
             obj.put("time", System.currentTimeMillis());
 
             MqttMessage msg = new MqttMessage(obj.toString().getBytes(StandardCharsets.UTF_8));
