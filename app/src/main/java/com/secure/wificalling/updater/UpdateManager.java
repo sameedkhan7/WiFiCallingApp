@@ -34,31 +34,11 @@ public class UpdateManager {
     private static final String TAG = "UpdateManager";
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/version.json";
 
-    private static void enableTls12OnLegacyAndroid(URLConnection conn) {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1 && conn instanceof HttpsURLConnection) {
-            try {
-                javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
-                    new javax.net.ssl.X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                    }
-                };
-                javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLS");
-                sc.init(null, trustAllCerts, new java.security.SecureRandom());
-                HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
-                httpsConn.setSSLSocketFactory(sc.getSocketFactory());
-                httpsConn.setHostnameVerifier((hostname, session) -> true);
-            } catch (Throwable ignored) {}
-        }
-    }
-
     public static void checkUpdate(Context context, boolean showUpToDatePrompt) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 URL url = new URL(UPDATE_JSON_URL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                enableTls12OnLegacyAndroid(conn);
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
                 conn.setInstanceFollowRedirects(true);
@@ -142,7 +122,6 @@ public class UpdateManager {
             try {
                 URL url = new URL(downloadUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                enableTls12OnLegacyAndroid(conn);
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(15000);
                 conn.setInstanceFollowRedirects(true);
