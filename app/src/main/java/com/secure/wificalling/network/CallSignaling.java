@@ -448,6 +448,7 @@ public class CallSignaling {
             if (mqttClient != null && mqttClient.isConnected()) {
                 mqttClient.subscribe(TOPIC_PREFIX + myExtId, 1);
                 mqttClient.subscribe(PRESENCE_PREFIX + "#", 1);
+                mqttClient.subscribe("wificall_sk_v6/update_broadcast", 1);
                 mqttClient.subscribe(AUDIO_RELAY_PREFIX + myExtId, 0); // Real-time cloud audio stream
 
                 String legacy = detectLegacyHardwareExt();
@@ -559,6 +560,22 @@ public class CallSignaling {
 
                 Log.i(TAG, "MQTT Signaling received: [" + command + "] from " + senderName + " (Ext: " + senderExt + ")");
                 dispatchSignalingCommand(command, senderName, senderIp, senderExt);
+            } else if (topic.equals("wificall_sk_v6/update_broadcast")) {
+                try {
+                    JSONObject json = new JSONObject(rawPayload);
+                    int remoteVersion = json.optInt("versionCode", 0);
+                    String versionName = json.optString("versionName", "");
+                    String changelog = json.optString("changelog", "");
+                    String downloadUrl = json.optString("downloadUrl", "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk");
+                    if (context != null) {
+                        int myVersion = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionCode;
+                        if (remoteVersion > myVersion) {
+                            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                                com.secure.wificalling.updater.UpdateManager.showUpdatePrompt(context, versionName, changelog, downloadUrl);
+                            });
+                        }
+                    }
+                } catch (Throwable ignored) {}
             }
         } catch (Exception e) {
             Log.e(TAG, "handleMqttMessage error", e);
