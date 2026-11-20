@@ -341,6 +341,7 @@ public class MainActivity extends Activity {
 
                     contactList.add(new ContactItem(ext, name, query, directIp, lastInteractionTime));
                 }
+                saveContacts(); // Persist upgraded usernames
             } catch (Exception ignored) {}
         }
 
@@ -457,14 +458,14 @@ public class MainActivity extends Activity {
                 CallSignaling.PeerStatus ps = CallSignaling.getPeerStatus(contact.ext);
                 String netType = (ps != null && ps.networkType != null) ? ps.networkType : "Online";
                 long age = (ps != null) ? (System.currentTimeMillis() - ps.lastSeen) : 0;
-                if (age < 180000) {
+                if (age < 75000) {
                     tvStatus.setText("🟢 Online (" + netType + ") • @" + contact.ext);
                 } else {
                     tvStatus.setText("🟢 Standby (" + netType + ") • @" + contact.ext);
                 }
                 tvStatus.setTextColor(Color.parseColor("#34A853"));
             } else {
-                tvStatus.setText("⚪ Offline / Standby • @" + contact.ext);
+                tvStatus.setText("⚪ Offline • @" + contact.ext);
                 tvStatus.setTextColor(Color.parseColor("#9E9E9E"));
             }
         }

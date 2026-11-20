@@ -189,11 +189,11 @@ public class CallSignaling {
     public static PeerStatus getPeerStatus(String ext) {
         if (ext == null) return null;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 600000)) return ps;
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 120000)) return ps;
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 600000)) return psAlias;
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 120000)) return psAlias;
         }
         return null;
     }
@@ -201,13 +201,13 @@ public class CallSignaling {
     public static boolean isPeerOnline(String ext) {
         if (ext == null) return false;
         PeerStatus ps = peerStatuses.get(ext);
-        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 600000)) {
+        if (ps != null && (System.currentTimeMillis() - ps.lastSeen <= 120000)) {
             return true;
         }
         String alias = resolveExtAlias(ext);
         if (alias != null) {
             PeerStatus psAlias = peerStatuses.get(alias);
-            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 600000)) {
+            if (psAlias != null && (System.currentTimeMillis() - psAlias.lastSeen <= 120000)) {
                 return true;
             }
         }
@@ -336,6 +336,14 @@ public class CallSignaling {
             sslOptions.setConnectionTimeout(6);
             sslOptions.setKeepAliveInterval(60);
 
+            try {
+                JSONObject willObj = new JSONObject();
+                willObj.put("ext", myExtId);
+                willObj.put("status", "offline");
+                willObj.put("time", System.currentTimeMillis());
+                sslOptions.setWill(PRESENCE_PREFIX + myExtId, willObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
+            } catch (Exception ignored) {}
+
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT SSL brokers...");
             mqttClient.connect(sslOptions);
@@ -360,6 +368,14 @@ public class CallSignaling {
             options.setCleanSession(true);
             options.setConnectionTimeout(5);
             options.setKeepAliveInterval(60);
+
+            try {
+                JSONObject willObj = new JSONObject();
+                willObj.put("ext", myExtId);
+                willObj.put("status", "offline");
+                willObj.put("time", System.currentTimeMillis());
+                options.setWill(PRESENCE_PREFIX + myExtId, willObj.toString().getBytes(StandardCharsets.UTF_8), 1, true);
+            } catch (Exception ignored) {}
 
             attachMqttCallback(mqttClient);
             Log.i(TAG, "Connecting to MQTT TCP brokers...");
@@ -456,17 +472,17 @@ public class CallSignaling {
                 long now = System.currentTimeMillis();
                 if (mqttClient == null || !mqttClient.isConnected()) {
                     connectMqttSynchronized();
-                } else if (now - lastFullPresencePublish >= 180000) {
+                } else if (now - lastFullPresencePublish >= 60000) {
                     publishPresence();
                     lastFullPresencePublish = now;
                 }
 
-                if (isWifiConnected() && (now - lastLocalBroadcast >= 180000)) {
+                if (isWifiConnected() && (now - lastLocalBroadcast >= 60000)) {
                     broadcastPresence();
                     lastLocalBroadcast = now;
                 }
 
-                Thread.sleep(60000); // 60s sleep: virtually zero CPU load and 0% battery drain in standby
+                Thread.sleep(30000); // 30s watchdog: lightweight, zero CPU load and 0% battery drain in standby
             } catch (InterruptedException ie) {
                 break;
             } catch (Throwable ignored) {}

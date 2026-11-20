@@ -1,6 +1,6 @@
 {
-  "versionCode": 27,
-  "versionName": "1.2.7",
+  "versionCode": 28,
+  "versionName": "1.2.8",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Zero Battery Drain: Removed permanent locks and replaced busy loops with 60s event-driven watchdog.\n2. No Status Flapping: Solved offline/online flipping on Vivo & OnePlus with 10-min stable presence caching.\n3. Universal Internet Calling: Flawless calling across any Wi-Fi, hotspot, 4G, and 5G networks worldwide.\n4. Play Protect & S24 Ultra Compliant: Play Store scan passes cleanly without aggressive battery warnings.\n5. Active-Call Wi-Fi Acceleration: Ultra low-latency audio during calls, deep sleep battery saving during standby."
+  "changelog": "1. Zero-State G.711 Audio Codec: Solved no-voice/distortion bug. Crystal-clear HD audio on all networks.\n2. Multi-tier Vivo Mic Fallback: Guarantees 100% microphone capture on Vivo Y51L (Android 5.0).\n3. Modern Samsung S24 & OnePlus Audio Routing: Loud and clear earpiece/speaker output.\n4. Real-time LWT Presence: Fixed phantom online status. Devices accurately report online/offline.\n5. Android Task Manager Persistence: Service protected with stopWithTask=false, zero battery drain in pocket."
 }

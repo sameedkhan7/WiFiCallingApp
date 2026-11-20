@@ -59,6 +59,7 @@
             android:name=".service.CallBackgroundService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="phoneCall" />
 
         <!-- Auto-Start on Device Boot -->
