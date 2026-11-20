@@ -1,6 +1,6 @@
 {
-  "versionCode": 29,
-  "versionName": "1.2.9",
+  "versionCode": 30,
+  "versionName": "1.3.0",
   "downloadUrl": "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/WiFiPhone.apk",
-  "changelog": "1. Google Play Protect Fully Clean: Removed dangerous dropper permissions (REQUEST_INSTALL_PACKAGES) and unsafe SSL trust managers.\n2. Official Application Icon: Replaced broken internal symbol with valid adaptive HD vector icon.\n3. Zero-State G.711 Audio Codec: Crystal-clear voice without distortion across Wi-Fi & 4G/5G.\n4. Vivo Y51L Multi-tier Mic Fallback: Reliable mic capture on Android 5.0.\n5. Real-time LWT Presence & Low Battery: No phantom online status, zero CPU wakelock in pocket."
+  "changelog": "1. 100% Play Protect Compliant: Completely eliminated all APK self-installer (dropper) intents, unknown sources requests, and file provider paths.\n2. Screen & Notification Safety: Removed restricted full-screen intent triggers; pure native incoming call notifications and lockscreen wakeup.\n3. Smooth Profile Editing: High-contrast fields for Vivo Y51L and OnePlus; non-blocking startup.\n4. Crystal-Clear Audio: Zero-state G.711 mu-law HD voice engine across Wi-Fi & 4G/5G mobile data.\n5. Battery-Optimized 24/7 Standby: Event-driven keepalive with zero CPU battery drain."
 }

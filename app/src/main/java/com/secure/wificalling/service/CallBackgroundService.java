@@ -188,7 +188,7 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Internet Call Active")
                     .setContentText("Ready to receive calls (Ext: " + CallSignaling.detectMyExtensionId() + ")")
-                    .setSmallIcon(android.R.drawable.sym_action_call)
+                    .setSmallIcon(com.secure.wificalling.R.drawable.ic_launcher)
                     .setContentIntent(pendingIntent)
                     .setOngoing(true);
 
@@ -253,22 +253,13 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             signaling.sendCommand(callerExt, callerIp, "RINGING");
         }
 
-        // 2. Wake screen from deep sleep
-        try {
-            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                PowerManager.WakeLock fullWake = pm.newWakeLock(
-                        PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
-                        "WiFiCalling:IncomingCallWake"
-                );
-                fullWake.acquire(30000);
-            }
-        } catch (Throwable ignored) {}
+        // 2. Wake CPU safely
+        acquireTempWakeLock(25000);
 
         // 3. Play loud ringtone immediately
         playIncomingRingtone();
 
-        // 4. Launch FullScreen Intent & Activity
+        // 4. Launch Incoming Call Activity & Notification
         try {
             Intent callIntent = new Intent(this, IncomingCallActivity.class);
             callIntent.putExtra("CALLER_NAME", resolvedName);
@@ -278,19 +269,19 @@ public class CallBackgroundService extends Service implements CallSignaling.Call
             callIntent.putExtra("CALLER_PUBLIC_EP", CallSignaling.getPeerPublicEndpoint(callerExt));
             callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
 
-            PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+            PendingIntent contentPendingIntent = PendingIntent.getActivity(
                     this, 0, callIntent,
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE : PendingIntent.FLAG_UPDATE_CURRENT
             );
 
             NotificationCompat.Builder notifBuilder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.sym_action_call)
+                    .setSmallIcon(com.secure.wificalling.R.drawable.ic_launcher)
                     .setContentTitle(resolvedName)
                     .setContentText(callerName + " (Ext " + callerExt + ") is calling...")
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .setFullScreenIntent(fullScreenPendingIntent, true)
+                    .setContentIntent(contentPendingIntent)
                     .setAutoCancel(true);
 
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);

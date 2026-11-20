@@ -1,38 +1,30 @@
 package com.secure.wificalling.updater;
 
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
-import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
-import androidx.core.content.FileProvider;
 import org.json.JSONObject;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.concurrent.Executors;
-import javax.net.ssl.HttpsURLConnection;
 
 /**
- * 1-Click In-App Auto Updater via GitHub Releases / Raw Repo.
- * Zero-cost, unlimited bandwidth, instant in-place updates.
- * Compatible with legacy Android (5.0+) and modern Android (14+).
+ * Clean & Play Protect Compliant Update Checker.
+ * Zero package installer intents, zero APK file downloads, zero security flags.
+ * Launches official GitHub release directly in default system browser.
  */
 public class UpdateManager {
 
     private static final String TAG = "UpdateManager";
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/sameedkhan7/WiFiCallingApp/main/version.json";
+    public static final String GITHUB_RELEASE_URL = "https://github.com/sameedkhan7/WiFiCallingApp/releases/latest";
 
     public static void checkUpdate(Context context, boolean showUpToDatePrompt) {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -74,7 +66,7 @@ public class UpdateManager {
                 JSONObject json = new JSONObject(rawJson);
                 int remoteVersionCode = json.optInt("versionCode", 1);
                 String remoteVersionName = json.optString("versionName", "1.0.0");
-                String downloadUrl = json.optString("downloadUrl", "");
+                String downloadUrl = json.optString("downloadUrl", GITHUB_RELEASE_URL);
                 String changelog = json.optString("changelog", "Bug fixes and stability improvements.");
 
                 PackageInfo pInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
@@ -100,123 +92,20 @@ public class UpdateManager {
 
     private static void showUpdatePrompt(Context context, String versionName, String changelog, String downloadUrl) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setTitle("⚡ Update Available (v" + versionName + ")");
-        builder.setMessage("What's New:\n" + changelog + "\n\nUpdate now in 1-click without losing any settings?");
-        builder.setPositiveButton("UPDATE NOW", (dialog, which) -> downloadAndInstallApk(context, downloadUrl, versionName));
+        builder.setTitle("Update Available (v" + versionName + ")");
+        builder.setMessage("What's New:\n" + changelog + "\n\nDownload the new version from GitHub?");
+        builder.setPositiveButton("UPDATE", (dialog, which) -> {
+            try {
+                String targetUrl = (downloadUrl != null && !downloadUrl.isEmpty()) ? downloadUrl : GITHUB_RELEASE_URL;
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(browserIntent);
+            } catch (Exception e) {
+                Toast.makeText(context, "Unable to open browser: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
         builder.setNegativeButton("Later", (dialog, which) -> dialog.dismiss());
         builder.setCancelable(true);
         builder.show();
-    }
-
-    private static void downloadAndInstallApk(Context context, String downloadUrl, String versionName) {
-        ProgressDialog progress = new ProgressDialog(context);
-        progress.setTitle("Downloading Update");
-        progress.setMessage("Downloading v" + versionName + " update...");
-        progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        progress.setIndeterminate(false);
-        progress.setMax(100);
-        progress.setCancelable(false);
-        progress.show();
-
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                URL url = new URL(downloadUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(15000);
-                conn.setInstanceFollowRedirects(true);
-                conn.connect();
-
-                int fileLength = conn.getContentLength();
-                InputStream input = conn.getInputStream();
-
-                File updateFile = new File(context.getExternalFilesDir(null), "update.apk");
-                if (updateFile.exists()) updateFile.delete();
-
-                FileOutputStream output = new FileOutputStream(updateFile);
-                byte[] data = new byte[4096];
-                long total = 0;
-                int count;
-                while ((count = input.read(data)) != -1) {
-                    total += count;
-                    if (fileLength > 0) {
-                        int percent = (int) (total * 100 / fileLength);
-                        new Handler(Looper.getMainLooper()).post(() -> progress.setProgress(percent));
-                    }
-                    output.write(data, 0, count);
-                }
-
-                output.flush();
-                output.close();
-                input.close();
-
-                try {
-                    File publicDownloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                    if (publicDownloadDir != null && publicDownloadDir.exists()) {
-                        File publicApk = new File(publicDownloadDir, "InternetCall.apk");
-                        FileInputStream src = new FileInputStream(updateFile);
-                        FileOutputStream dst = new FileOutputStream(publicApk);
-                        byte[] buf = new byte[8192];
-                        int len;
-                        while ((len = src.read(buf)) > 0) {
-                            dst.write(buf, 0, len);
-                        }
-                        src.close();
-                        dst.close();
-                    }
-                } catch (Throwable ignored) {}
-
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    progress.dismiss();
-                    installApk(context, updateFile);
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "Download APK failed", e);
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    progress.dismiss();
-                    Toast.makeText(context, "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        });
-    }
-
-    private static void installApk(Context context, File apkFile) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    if (!context.getPackageManager().canRequestPackageInstalls()) {
-                        Intent manageIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                        manageIntent.setData(Uri.parse("package:" + context.getPackageName()));
-                        manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        context.startActivity(manageIntent);
-                        Toast.makeText(context, "Please enable 'Allow from this source' to complete update", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                } catch (Throwable t) {
-                    Log.w(TAG, "canRequestPackageInstalls check error", t);
-                }
-            }
-
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            Uri apkUri;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                apkUri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", apkFile);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            } else {
-                apkUri = Uri.fromFile(apkFile);
-            }
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(intent);
-        } catch (Exception e) {
-            Log.e(TAG, "Install failed", e);
-            try {
-                Intent openDownloads = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS);
-                openDownloads.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(openDownloads);
-            } catch (Throwable ignored) {}
-            Toast.makeText(context, "Saved to Downloads/InternetCall.apk! Tap it in Downloads to install", Toast.LENGTH_LONG).show();
-        }
     }
 }

@@ -198,10 +198,7 @@ public class MainActivity extends Activity {
     }
 
     private void checkPromptUsernameRegistration() {
-        boolean hasRegistered = prefs.getBoolean("HAS_SET_USERNAME_V5", false);
-        if (!hasRegistered) {
-            showMandatoryUsernameSetupDialog();
-        }
+        // Automatically initialized with clean defaults - no blocking popup on startup
     }
 
     private void showMandatoryUsernameSetupDialog() {
@@ -590,10 +587,16 @@ public class MainActivity extends Activity {
 
         final EditText etName = new EditText(this);
         etName.setHint("Contact Name (e.g. Sameed, Home, Friend)");
+        etName.setTextColor(Color.WHITE);
+        etName.setHintTextColor(Color.parseColor("#888888"));
+        etName.setSingleLine(true);
         layout.addView(etName);
 
         final EditText etExt = new EditText(this);
         etExt.setHint("Calling Number / ID (e.g. 101, 102, 105...)");
+        etExt.setTextColor(Color.WHITE);
+        etExt.setHintTextColor(Color.parseColor("#888888"));
+        etExt.setSingleLine(true);
         layout.addView(etExt);
 
         builder.setView(layout);
@@ -634,11 +637,17 @@ public class MainActivity extends Activity {
         final EditText etName = new EditText(this);
         etName.setText(contact.name);
         etName.setHint("Contact Name");
+        etName.setTextColor(Color.WHITE);
+        etName.setHintTextColor(Color.parseColor("#888888"));
+        etName.setSingleLine(true);
         layout.addView(etName);
 
         final EditText etExt = new EditText(this);
         etExt.setText(contact.ext);
         etExt.setHint("Calling Number / ID");
+        etExt.setTextColor(Color.WHITE);
+        etExt.setHintTextColor(Color.parseColor("#888888"));
+        etExt.setSingleLine(true);
         layout.addView(etExt);
 
         builder.setView(layout);
@@ -689,13 +698,19 @@ public class MainActivity extends Activity {
         layout.addView(tvHint);
 
         final EditText etName = new EditText(this);
-        etName.setHint("Your Name (e.g. Sameed, Papa, Ghar)");
+        etName.setHint("Your Name (e.g. Sameed, Ammi, Faiza)");
         etName.setText(getMyProfileName(this));
+        etName.setTextColor(Color.WHITE);
+        etName.setHintTextColor(Color.parseColor("#888888"));
+        etName.setSingleLine(true);
         layout.addView(etName);
 
         final EditText etExt = new EditText(this);
-        etExt.setHint("Calling ID / Username (e.g. 102, sameed)");
+        etExt.setHint("Calling ID / Username (e.g. sameed, ammi)");
         etExt.setText(myExtId);
+        etExt.setTextColor(Color.WHITE);
+        etExt.setHintTextColor(Color.parseColor("#888888"));
+        etExt.setSingleLine(true);
         layout.addView(etExt);
 
         builder.setView(layout);
